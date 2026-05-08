@@ -16,6 +16,7 @@ Create a Python env and add the kernel to the notebook service:
 
 ```
 conda env create -f conda_envs/hk26_env.yaml
+conda activate hk26_env
 python -m ipykernel install --user --name hk26_env --display-name "Hackathon 2026 (conda)"
 ```
 
