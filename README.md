@@ -20,6 +20,37 @@ To use these on JASMIN, clone this repo into your home directory and then naviga
 Or you can directly download the notebook and upload to the [JASMIN notebook service](https://notebooks.jasmin.ac.uk/).
 The notebooks can also be run locally; just set use the `online` catalog.
 
+## Sharing code
+
+There are directories for the different groups in this repo, all prefixed with `hk26-`. Any code and notebooks can be shared here, for notebooks please
+check they run with the standard conda env and clear all output before committing. 
+You cannot push directly to the main branch, instead, follow these instructions to create a Pull Request PR:
+
+```bash
+# Make sure main is up-to-date
+git checkout main
+git pull
+
+# Create a new branch locally with a sensible branch name
+git checkout -b my_new_branch
+
+# Commit your changes
+git status
+git add .
+git commit
+
+# Push your changes to github
+git push origin my_new_branch
+
+# Go to https://github.com/digital-earths-UK-hackathon/hk26 and look for the option to create new pull request.
+# Or go straight to https://github.com/digital-earths-UK-hackathon/hk26/pulls
+# Create and merge your PR into main.
+
+# Checkout main and get your new changes
+git checkout main
+git pull
+```
+
 ## Getting help
 
 If you run into problems with JASMIN accounts, you can access [JASMIN support](https://www.jasmin.ac.uk/help/contact/).
