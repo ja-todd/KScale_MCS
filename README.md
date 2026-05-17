@@ -51,6 +51,8 @@ git checkout main
 git pull
 ```
 
+Feel free to ask if you need help with this.
+
 ## Getting help
 
 If you run into problems with JASMIN accounts, you can access [JASMIN support](https://www.jasmin.ac.uk/help/contact/).
