@@ -1,12 +1,13 @@
 # hk26 Tropical Cyclones group
 
 ## Core team
-Alex Baker
-Malcolm Roberts
-Lewis Grant
-Giacomo Giuliani 
-Jake Bland
-Ken Rui Fong
-* 
+* Calum Scullion
+* Malcolm Roberts
+* Lewis Grant
+* Giacomo Giuliani 
+* Jake Bland
+* Ken Rui Fong
+* Alex Baker
 
-Note - many of these notebooks require the installation of python package huracanpy into the hk26 virtual env. See installation instructions here: https://huracanpy.readthedocs.io/en/stable/user_guide/install.html
+Notebooks, data and results from last hackathon: [https://github.com/stella-bourdin/hk25-teams](https://github.com/stella-bourdin/hk25-teams).
+Note - many of these notebooks require the installation of python package huracanpy into the hk26 virtual env. See installation instructions here: [https://huracanpy.readthedocs.io/en/stable/user_guide/install.html](https://huracanpy.readthedocs.io/en/stable/user_guide/install.html).
