@@ -10,4 +10,5 @@
 * Alex Baker
 
 Notebooks, data and results from last hackathon: [https://github.com/stella-bourdin/hk25-teams](https://github.com/stella-bourdin/hk25-teams).
-Note - many of these notebooks require the installation of python package huracanpy into the hk26 virtual env. See installation instructions here: [https://huracanpy.readthedocs.io/en/stable/user_guide/install.html](https://huracanpy.readthedocs.io/en/stable/user_guide/install.html).
+
+[!NOTE] Many of these notebooks require the installation of python package huracanpy into the hk26 virtual env. See installation instructions here: [https://huracanpy.readthedocs.io/en/stable/user_guide/install.html](https://huracanpy.readthedocs.io/en/stable/user_guide/install.html).
