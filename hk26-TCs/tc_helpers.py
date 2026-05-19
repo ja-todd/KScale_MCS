@@ -2,6 +2,22 @@ import huracanpy
 import xarray as xr
 import numpy as np
 
+hk26_colours = {
+    '10kmCoMorph': 'violet',
+    '5kmCoMorph': 'darkviolet',
+    '10kmGAL': 'b',
+    '5kmRAL' : 'darkorange',
+    'IBTrACS': 'k',
+}
+
+hk26_linestyles = {
+    '10kmCoMorph': '-',
+    '5kmCoMorph': '--',
+    '10kmGAL': '-',
+    '5kmRAL' : '--',
+    'IBTrACS' : '-',
+}
+
 def compute_intensification_rate(tracks, var, timedelta):
     """This function computes the 24-hr intensification rate for each track in the provided tracks object.
     Works with either wind or pressure variable
