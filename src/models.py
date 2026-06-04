@@ -15,7 +15,8 @@ Pipeline usage
 from pathlib import Path
 
 # S3_BASE     = 'https://hackathon-o.s3-ext.jc.rl.ac.uk/sim-data/analysis/PyFLEXTRKR'
-S3_BASE     = 'http://hackathon-o.s3.jc.rl.ac.uk/sim-data/analysis/PyFLEXTRKR'
+# S3_BASE     = 'http://hackathon-o.s3.jc.rl.ac.uk/sim-data/analysis/PyFLEXTRKR'
+TRACK_DIR = "/gws/ssde/j25b/mcs_prime/mmuetz/data/hk26/pyflextrkr_tracks/sim-data/analysis/PyFLEXTRKR"
 CATALOG_URL = 'https://digital-earths-global-hackathon.github.io/catalog/catalog.yaml'
 DATE_RANGE  = '20200201.0000_20210301.0000'
 
@@ -52,12 +53,12 @@ def _pyflex_key(model):
 
 def mask_url(model):
     zoom = MODELS[model]['zoom']
-    return (f'{S3_BASE}/{_pyflex_key(model)}/mcstracking/'
+    return (f'{TRACK_DIR}/{_pyflex_key(model)}/mcstracking/'
             f'mcs_mask_hp{zoom}_{DATE_RANGE}.zarr')
 
 
 def stats_url(model):
-    return (f'{S3_BASE}/{_pyflex_key(model)}/stats/'
+    return (f'{TRACK_DIR}/{_pyflex_key(model)}/stats/'
             f'mcs_tracks_final_{DATE_RANGE}.nc')
 
 
@@ -66,7 +67,7 @@ def stats_url(model):
 # ---------------------------------------------------------------------------
 
 def data_dir(model):
-    return Path('/gws/ssde/j25b/mcs_prime/jtodd/bh_entrainment/data') / model
+    return Path('/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data') / model
 
 
 def figs_dir(model):

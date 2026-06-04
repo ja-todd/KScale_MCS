@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-import models
+import src.models as models 
 
 MODEL = 'UM N2560 RAL3.3'   # overridden at runtime if --model is given
 

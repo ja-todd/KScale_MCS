@@ -23,7 +23,7 @@ import intake
 import numpy as np
 import xarray as xr
 
-import models
+import src.models as models 
 from metpy.calc import cape_cin, dewpoint_from_relative_humidity, el, parcel_profile
 from metpy.units import units
 

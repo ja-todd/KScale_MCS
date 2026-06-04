@@ -20,7 +20,7 @@ import pandas as pd
 import requests
 import xarray as xr
 
-import models
+import src.models as models 
 
 warnings.filterwarnings('ignore', message='.*The return type of `Dataset.dims`.*', category=FutureWarning)
 
@@ -43,8 +43,9 @@ ENTRAINMENT_ZARR = None
 def load_track_stats():
     """Fetch PyFLEXTRKR track statistics from S3."""
     print('Loading MCS track statistics...')
-    response = requests.get(STATS_URL, stream=True)
-    dstracks = xr.open_dataset(BytesIO(response.content), mask_and_scale=True)
+    # response = requests.get(STATS_URL, stream=True)
+    # dstracks = xr.open_dataset(BytesIO(response.content), mask_and_scale=True)
+    dstracks = xr.open_dataset(STATS_URL, mask_and_scale=True)  ## used if the data on disk
 
     # Round times to nearest second (small offset in source data)
     def _round(t):

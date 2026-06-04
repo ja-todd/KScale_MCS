@@ -16,7 +16,7 @@ import numpy as np
 import requests
 import xarray as xr
 
-import models
+import src.models as models
 
 LON_MIN, LON_MAX = -25, 25
 LAT_MIN, LAT_MAX = -2, 20

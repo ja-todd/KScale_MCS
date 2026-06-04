@@ -15,7 +15,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import xarray as xr
 
-import models
+import src.models as models 
 
 # Burkina Faso sub-box (fixed; within the WAM region), in [-180, 180] convention
 BF_LAT_MIN, BF_LAT_MAX = 9, 15
