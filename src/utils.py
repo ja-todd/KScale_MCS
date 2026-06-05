@@ -4,8 +4,12 @@ import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
+import src.models as models
+import intake
 import easygems.healpix as egh
+import warnings
+
+warnings.filterwarnings('ignore', message='.*The return type of `Dataset.dims`.*', category=FutureWarning)
 
 
 def hp_mods(ds):
@@ -71,3 +75,27 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
 
     return R * c
+
+def _region_mask(ds, region_cfg):
+    """Boolean cell mask for the analysis region (handles lon wrap-around)."""
+    lon_min, lon_max = region_cfg['lon_min'], region_cfg['lon_max']
+    lat_min, lat_max = region_cfg['lat_min'], region_cfg['lat_max']
+    if lon_min > lon_max:   # region wraps across 0°/360°
+        lon_mask = (ds.lon > lon_min) | (ds.lon < lon_max)
+    else:
+        lon_mask = (ds.lon > lon_min) & (ds.lon < lon_max)
+    return lon_mask & (ds.lat > lat_min) & (ds.lat < lat_max)
+
+
+def open_region_dataset(model, region_cfg):
+    zoom = models.MODELS[model]['zoom']
+    cat  = intake.open_catalog(models.CATALOG_URL)['UK']
+    ds3h = cat[model](zoom=zoom, time='PT3H').to_dask().pipe(hp_mods)
+    return ds3h.isel(cell=_region_mask(ds3h, region_cfg))
+
+
+def open_region_1h_dataset(model, region_cfg):
+    zoom = models.MODELS[model]['zoom']
+    cat  = intake.open_catalog(models.CATALOG_URL)['UK']
+    ds1h = cat[model](zoom=zoom, time='PT1H').to_dask().pipe(hp_mods)
+    return ds1h.isel(cell=_region_mask(ds1h, region_cfg))
