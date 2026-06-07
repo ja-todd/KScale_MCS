@@ -5,22 +5,13 @@ Links fmse_<region>.zarr (3-hourly) with the PyFLEXTRKR MCS pixel mask (hourly) 
 a NetCDF with dims (tracks, times_3h) following PyFLEXTRKR output conventions.
 
 
-
 Code logic: 
 
-Create a frozen MSE dataset filtered on the MCS locations 
-Identify updrafts (w > 1 m/s, q_l + q_i > 0.01 g/kg) within the MCS locations 
-Identify environment at X radius from these updrafts (on the unfiltered frozen MSE dataset)
-    - (Handle contiguous updrafts)
-    - Horizontally average the frozen MSE over nonupdraft grid points to get an environmental frozen MSE
-For each model level (pressure level here) average updraft MSE and env. MSE over space and time
-Weight updraft MSE with the updraft mass flux 
-Calculate the entrainment rate
-
-
-
+Create a frozen MSE dataset filtered on the MCS locations, with track_id in the output zarr
 
 Usage: 
+
+    python submit.py --model <model_id> --script calc_mcs_fmse 
 
 """ 
 """ 
@@ -33,16 +24,12 @@ import json
 import numpy as np 
 import xarray as xr 
 import dask.array as dsa 
-from multiprocessing import Pool 
 import warnings
 import sys
 import intake 
 from pathlib import Path 
 import easygems.healpix as egh 
 import src.models as models 
-import microphysics as micro
-from metpy.calc import dewpoint_from_relative_humidity, virtual_temperature_from_dewpoint
-from metpy.units import units 
 import pandas as pd
 
 
@@ -59,9 +46,6 @@ ZOOM             = None
 MASK_URL         = None
 STATS_URL        = None
 FMSE_ZARR         = None
-
-
-ENTR_VARS = 'fmse'
 
 
 #----------------------------------------------------------------------
