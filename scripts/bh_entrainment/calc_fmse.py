@@ -1,9 +1,16 @@
+
+"""
+
+MSE computation (h = c_p*T + gz + L_v*q_v + L_i*q_i) (Stirling and Stratton, 2012; Becker and Hohenegger, 2021)
+Produces 4D field of frozen MSE over <region> cells. 
+
+"""
+
 import argparse
 import json
 import numpy as np 
 import xarray as xr 
-import dask.array as dsa 
-from multiprocessing import Pool 
+import dask.array as dsa  
 import warnings
 import sys
 import intake 
@@ -16,9 +23,6 @@ from metpy.units import units
 
 
 CHUNK_SIZE = 10 
-N_WORKERS = 10 
-
-
 
 ### filter annoying warnings 
 warnings.filterwarnings('ignore', message='.*The return type of `Dataset.dims`.*', category=FutureWarning)
@@ -86,7 +90,7 @@ def init_zarr(model, region):
 
 
         }, 
-        coords={'time': ds.time, 'pressure': ds.pressure, 'cell': ds.cell, 'lat': ds.lat, 'lon': ds.lon},
+        coords={'time': ds.time, 'pressure': ds.pressure.sortby('pressure', ascending=False), 'cell': ds.cell, 'lat': ds.lat, 'lon': ds.lon},
         
     )
 
@@ -96,16 +100,14 @@ def init_zarr(model, region):
 
     done_dir = models.done_dir(model)
     done_dir.mkdir(parents=True, exist_ok=True)
-    models.init_donefile(model, region).touch()
+    models.init_donefile(model, region, tag='fmse').touch()
     print(f'Created {zarr_path}  shape=({n_times}, {n_pressures}, {n_cells})')
     print(f'Submit array 0-{n_chunks - 1}  ({n_chunks} jobs)  via: python submit.py --model {model}')
 
-#-----------------------------------------------------------------------
-# MSE computation (h = c_p*T + gz + L_v*q_v + L_i*q_i) (Becker et al., 2018; Becker and Hohenegger, 2021)
-#-----------------------------------------------------------------------
+
 
 #-----------------------------------------------------------------------
-# Chunk processing
+# Chunk processing (MSE computation)
 #-----------------------------------------------------------------------
 
 def compute_chunk(chunk_idx, model, region, n_timesteps=None): 

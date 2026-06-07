@@ -10,3 +10,6 @@ donefiles/
 slurm/
 figs/
 mse_notebook.ipynb
+test_mcs_tracks.ipynb
+mcs_track_healpix_UM.ipynbtesting_mcs_mask.ipynb
+*.ipynb

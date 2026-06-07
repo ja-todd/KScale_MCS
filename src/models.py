@@ -78,8 +78,8 @@ def done_dir(model):
     return Path('donefiles') / model
 
 
-def init_donefile(model, region):
-    return done_dir(model) / f'init_{region}.done'
+def init_donefile(model, region, tag='default'):
+    return done_dir(model) / f'init_{region}_{tag}.done'
 
 
 def chunk_donefile(model, chunk_idx, tag='default'):

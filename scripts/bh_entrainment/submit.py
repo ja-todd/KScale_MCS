@@ -31,23 +31,27 @@ SBATCH_OPTS = {
     'ntasks':        '1',
     'cpus-per-task': '1',
     'mem':           '8G',
-    'time':          '10:0:00',
+    'time':          '01:0:00',
     'partition':     'standard',
     'qos':           'high',
 }
 
+SCRIPT_CONFIGS = {
+    'calc_fmse':     {'tag': 'fmse',     'zarr': 'fmse_{region}.zarr',     'script': 'calc_fmse.py'},
+    'calc_mcs_fmse': {'tag': 'mcs_fmse', 'zarr': 'mcs_fmse_{region}.zarr', 'script': 'calc_mcs_fmse.py'},
+}
 
 def count_zarr_times(zarr_path):
     import xarray as xr
     return xr.open_zarr(zarr_path).sizes['time']
 
 
-def pending_chunks(model, region):
+def pending_chunks(model, region, tag, zarr_path):
     zarr_path = models.data_dir(model) / f'fmse_{region}.zarr'
     n_times   = count_zarr_times(zarr_path)
     n_chunks  = (n_times + CHUNK_SIZE - 1) // CHUNK_SIZE
     return [i for i in range(n_chunks)
-            if not models.chunk_donefile(model, i, tag='fmse').exists()]
+            if not models.chunk_donefile(model, i, tag=tag).exists()]
 
 
 def write_task_json(model, region, chunks, name):
@@ -60,7 +64,7 @@ def write_task_json(model, region, chunks, name):
     return path
 
 
-def write_slurm_script(name, json_path, n_tasks):
+def write_slurm_script(name, json_path, n_tasks, script_name):
     script_path = Path('slurm') / 'scripts' / f'{name}.sh'
     script_path.parent.mkdir(parents=True, exist_ok=True)
     output_dir  = Path('slurm') / 'output'
@@ -76,9 +80,9 @@ def write_slurm_script(name, json_path, n_tasks):
         f'#SBATCH --error={output_dir}/%A_%a.err',
         '',
         'source ~/miniforge3/bin/activate',
-        'conda activate hk26_env',
+        'conda activate hk26_env',   ### change if needed 
         '',
-        f'python calc_fmse.py {json_path} $SLURM_ARRAY_TASK_ID',
+        f'python {script_name} {json_path} $SLURM_ARRAY_TASK_ID',
     ]
     script_path.write_text('\n'.join(lines) + '\n')
     return script_path
@@ -91,15 +95,23 @@ def main():
     models.add_region_arg(parser)
     parser.add_argument('--dry-run', action='store_true',
                         help='Print what would happen without running sbatch or --init')
+    parser.add_argument('--script', choices=SCRIPT_CONFIGS.keys(),
+                        default='calc_fmse',
+                        help='Which script to submit (default: calc_fmse)')
     args = parser.parse_args()
 
     model, region = args.model, args.region
 
+    cfg        = SCRIPT_CONFIGS[args.script]
+    tag        = cfg['tag']
+    zarr_path  = models.data_dir(model) / cfg['zarr'].format(region=region)
+    script     = cfg['script']
+
     # --- Ensure zarr is initialised ---
-    init_done = models.init_donefile(model, region)
+    init_done = models.init_donefile(model, region, tag=tag)
     if not init_done.exists():
         print(f'init.done not found — running --init for {model} / {region}...')
-        cmd = [sys.executable, 'calc_fmse.py', '--init',
+        cmd = [sys.executable, script, '--init',
                '--model', model, '--region', region]
         if args.dry_run:
             print('  [dry-run]', ' '.join(cmd))
@@ -113,7 +125,7 @@ def main():
         return
 
     # --- Find pending chunks ---
-    chunks = pending_chunks(model, region)
+    chunks = pending_chunks(model, region, tag, zarr_path)
     if not chunks:
         print('All chunks complete — nothing to submit.')
         return
@@ -127,7 +139,7 @@ def main():
     name = f'{ts}_{model}_{region}'
 
     json_path   = write_task_json(model, region, chunks, name)
-    script_path = write_slurm_script(name, json_path, n)
+    script_path = write_slurm_script(name, json_path, n, script)
     print(f'Task JSON:    {json_path}')
     print(f'SLURM script: {script_path}')
 
