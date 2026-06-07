@@ -61,6 +61,9 @@ STATS_URL        = None
 FMSE_ZARR         = None
 
 
+ENTR_VARS = 'fmse'
+
+
 #----------------------------------------------------------------------
 # Data loading 
 #----------------------------------------------------------------------
@@ -234,7 +237,11 @@ def init_zarr(model, region):
 
     template = xr.Dataset(
         { 
-            'fmse': xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'J kg-1'})
+            'fmse': xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'J kg-1'}), 
+            'track_id': xr.DataArray(dsa.full((n_times, n_cells), np.nan, dtype=np.float32, 
+                 chunks=(CHUNK_SIZE, n_cells)),
+        dims=['time', 'cell'],
+        attrs={'description': 'MCS track number at each cell'})
 
 
         }, 
@@ -251,15 +258,6 @@ def init_zarr(model, region):
     models.init_donefile(model, region, tag='mcs_fmse').touch()
     print(f'Created {zarr_path}  shape=({n_times}, {n_pressures}, {n_cells})')
     print(f'Submit array 0-{n_chunks - 1}  ({n_chunks} jobs)  via: python submit.py --model {model}')
-
-
-# fmse_ds = open_fmse()
-# mask_ds = open_mcs_mask()
-# dstracks = load_track_stats()
-# region_cfg = models.REGIONS['wam']
-# dstracks_wam = filter_region_tracks(dstracks, region_cfg)
-# wam_positions = compute_wam_positions(fmse_ds, mask_ds)
-# fmse_idxs, mask_idxs, times_3h = align_times(fmse_ds, mask_ds)
 
 
 def compute_chunk(chunk_idx, model, region, n_timesteps=None): 
@@ -284,9 +282,12 @@ def compute_chunk(chunk_idx, model, region, n_timesteps=None):
 
     print(f'Chunk {chunk_idx}: time[{t_start}:{t_end}] ({n_chunk} timesteps)')
     fmse_chunk  = fmse_ds.isel(time=slice(t_start, t_end))['fmse'].compute().values
+    n_cells = fmse_chunk.shape[2]
+
 
     mcs_fmse_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    
+    track_id_out = np.full((n_chunk, n_cells), np.nan, dtype=np.float32)
+
     in_chunk        = (fmse_idxs >= t_start) & (fmse_idxs < t_end)
     fmse_idxs_chunk = fmse_idxs[in_chunk]
     mask_idxs_chunk = mask_idxs[in_chunk]
@@ -303,9 +304,11 @@ def compute_chunk(chunk_idx, model, region, n_timesteps=None):
             continue  # no MCS at this timestep, leave as NaN
 
         mcs_fmse_out[i, :, mcs_bool] = fmse_chunk[i, :, mcs_bool]
+        track_id_out[i, mcs_bool] = mask_wam[mcs_bool]
 
     ds_out = xr.Dataset({
-        'fmse': xr.DataArray(mcs_fmse_out,          dims=['time', 'pressure', 'cell'])
+        'fmse': xr.DataArray(mcs_fmse_out,          dims=['time', 'pressure', 'cell']), 
+        'track_id': xr.DataArray(track_id_out, dims=['time', 'cell'])
     })
 
     ds_out.to_zarr(zarr_path, region={'time': slice(t_start, t_end)})
