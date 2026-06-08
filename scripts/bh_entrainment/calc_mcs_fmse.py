@@ -30,6 +30,7 @@ import intake
 from pathlib import Path 
 import easygems.healpix as egh 
 import src.models as models 
+import src.utils
 import pandas as pd
 
 
@@ -244,17 +245,13 @@ def init_zarr(model, region):
     print(f'Submit array 0-{n_chunks - 1}  ({n_chunks} jobs)  via: python submit.py --model {model}')
 
 
-def compute_chunk(chunk_idx, model, region, n_timesteps=None): 
+def compute_chunk(fmse_ds, mask_ds, chunk_idx, model, region, n_timesteps=None): 
     done_file = models.chunk_donefile(model, chunk_idx, tag='mcs_fmse')
     if done_file.exists():
         print(f'Chunk {chunk_idx} already done, skipping.')
         return
-    zarr_path     = models.data_dir(model) / f'mcs_fmse_{region}.zarr'  ## check this 
-    fmse_ds       = xr.open_zarr(models.data_dir(model) / f'fmse_{region}.zarr')
-    zoom = 9
-    MASK_URL = (f"/gws/ssde/j25b/mcs_prime/mmuetz/data/hk26/pyflextrkr_tracks/sim-data/analysis/"
-                f"PyFLEXTRKR/um_glm_n2560_RAL3p3_tuned_z9/mcstracking/mcs_mask_hp{zoom}_20200201.0000_20210301.0000.zarr")
-    mask_ds       = xr.open_zarr(MASK_URL, chunks={})
+    zarr_path     = models.data_dir(model) / f'mcs_fmse_{region}.zarr' 
+    
     wam_positions = compute_wam_positions(fmse_ds, mask_ds)
     fmse_idxs, mask_idxs, _ = align_times(fmse_ds, mask_ds)
 
@@ -323,8 +320,13 @@ def main():
         region     = task_cfg['region']
         chunk      = task_cfg['tasks'][task_index]['chunk']
         
+        global MASK_URL, ZOOM
+        ZOOM = models.MODELS[model]['zoom']
+        MASK_URL = models.mask_url(model)
+        mask_ds = xr.open_zarr(MASK_URL, chunks={})
+        fmse_ds = xr.open_zarr(models.data_dir(model) / f'fmse_{region}.zarr')
 
-        compute_chunk(chunk, model, region)
+        compute_chunk(fmse_ds, mask_ds, chunk, model, region)
         return
 
     parser = argparse.ArgumentParser(description=__doc__,
