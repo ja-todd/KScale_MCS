@@ -7,11 +7,11 @@ a NetCDF with dims (tracks, times_3h) following PyFLEXTRKR output conventions.
 
 Code logic: 
 
-Create a frozen MSE dataset filtered on the MCS locations, with track_id in the output zarr
+Output updraft frozen moist static energy and per-updraft mean frozen moist static energy for the environment
 
 Usage: 
 
-    python submit.py --model <model_id> --script calc_mcs_fmse 
+    python submit.py --model <model_id> --script calc_mcs_env_updraft_fmse 
 
 """ 
 """ 
@@ -41,7 +41,6 @@ warnings.filterwarnings('ignore', message='.*divide by zero encountered in log.*
 warnings.filterwarnings('ignore', message='.*invalid value encountered in divide.*', category=RuntimeWarning)
 
 CHUNK_SIZE = 10 
-RADIUS = None
 MAX_TIMES_3H = 217
 
 ZOOM             = None
@@ -224,7 +223,10 @@ def init_zarr(model, region):
     template = xr.Dataset(
         { 
             'fmse_env': xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'J kg-1'}),
-            'fmse_updraft': xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'J kg-1'}),  
+            'fmse_updraft': xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'J kg-1'}),
+            'z_updraft':   xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs={'units': 'm'}), 
+            'rho_updraft' : xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'kg m-3'}),
+            'w_updraft' : xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'm s-1'}),
             'track_id': xr.DataArray(dsa.full((n_times, n_cells), np.nan, dtype=np.float32, 
                  chunks=(CHUNK_SIZE, n_cells)),
         dims=['time', 'cell'],
@@ -246,20 +248,8 @@ def init_zarr(model, region):
     print(f'Created {zarr_path}  shape=({n_times}, {n_pressures}, {n_cells})')
     print(f'Submit array 0-{n_chunks - 1}  ({n_chunks} jobs)  via: python submit.py --model {model}')
 
-### effect of changing the radius - 10 km might 
-
-
-# def get_env_fmse(fmse_t, updraft_lats, updraft_lons, all_lats, all_lons, updraft_bool, radius=10):
-#     # distances from ALL updraft cells to ALL WAM cells - shape (n_updrafts, n_cells)
-#     env_mask = dsa.zeros(len(all_lats), dtype=bool)
-#     for lat, lon in zip(updraft_lats, updraft_lons):
-#         dist = haversine(lat, lon, all_lats, all_lons)
-#         env_mask |= (dist < radius) & (~updraft_bool)
-    
-#     return fmse_t[:, env_mask.compute()]
-
 def get_env_fmse(fmse_t, updraft_lats, updraft_lons, all_lats, all_lons, 
-                 updraft_bool, radius=10):
+                 updraft_bool, radius=50):
     """
     For each updraft cell, compute mean environment FMSE within radius.
     Returns fmse_env_per_updraft of shape (pressure, n_updrafts)
@@ -300,6 +290,9 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, n_timeste
 
     fmse_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
     fmse_env_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    z_updraft_out   = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    rho_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    w_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
     track_id_out = np.full((n_chunk, n_cells), np.nan, dtype=np.float32)
 
     in_chunk        = (fmse_idxs >= t_start) & (fmse_idxs < t_end)
@@ -333,14 +326,21 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, n_timeste
         updraft_mask = w_mask & qc_mask
 
 
-        cell_updraft = updraft_mask.any('pressure')
-        cell_indices = np.where(cell_updraft.values)[0]
+        cell_updraft = updraft_mask.any(axis=0)
+        cell_indices = np.where(cell_updraft)[0]
 
         original_cell_indices = np.where(mcs_bool)[0]
         updraft_original_indices = original_cell_indices[cell_indices]
 
         fmse_t = fmse_ds.fmse.isel(time=fi).compute().values  # (pressure, cell)
-        fmse_updrafts = fmse_t[:, updraft_original_indices]    # (pressure, n_updrafts)
+        z_t = fmse_ds.z.isel(time=fi).compute().values
+        rho_t = fmse_ds.rho.isel(time=fi).compute().values
+
+
+        fmse_updrafts = fmse_t[:, updraft_original_indices]   
+        z_updrafts = z_t[:, updraft_original_indices] 
+        rho_updrafts = rho_t[:, updraft_original_indices]# (pressure, n_updrafts)
+        w_updrafts = w_t[:, updraft_original_indices]
         updraft_lats = fmse_ds.lat.isel(cell=updraft_original_indices).values
         updraft_lons = fmse_ds.lon.isel(cell=updraft_original_indices).values
 
@@ -353,13 +353,19 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, n_timeste
 
 
         ### write to output properly - unsure how 
-        fmse_updraft_out[i, :, updraft_original_indices]  = fmse_t[:, updraft_original_indices]
-        fmse_env_out[i, :, updraft_original_indices]      = fmse_env_per_updraft
+        fmse_updraft_out[i, :, updraft_original_indices]  = fmse_updrafts.T
+        fmse_env_out[i, :, updraft_original_indices]      = fmse_env_per_updraft.T
+        rho_updraft_out[i, :, updraft_original_indices]   = rho_updrafts.T
+        z_updraft_out[i, :, updraft_original_indices]     = z_updrafts.T
+        w_updraft_out[i, :, updraft_original_indices]     = w_updrafts.T
         track_id_out[i, updraft_original_indices]         = mask_wam[updraft_original_indices]
 
     ds_out = xr.Dataset({
         'fmse_env': xr.DataArray(fmse_env_out,          dims=['time', 'pressure', 'cell']),
         'fmse_updraft': xr.DataArray(fmse_updraft_out,          dims=['time', 'pressure', 'cell']),  
+        'z_updraft': xr.DataArray(z_updraft_out,          dims=['time', 'pressure', 'cell']),
+        'rho_updraft': xr.DataArray(rho_updraft_out,          dims=['time', 'pressure', 'cell']),
+        'w_updraft': xr.DataArray(w_updraft_out,          dims=['time', 'pressure', 'cell']),
         'track_id': xr.DataArray(track_id_out, dims=['time', 'cell'])
     })
 

@@ -86,8 +86,9 @@ def init_zarr(model, region):
 
     template = xr.Dataset(
         { 
-            'fmse': xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'J kg-1'})
-
+            'fmse': xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'J kg-1'}), 
+            'z': xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'm'}),
+            'rho': xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs = {'units': 'kg m-3'})
 
         }, 
         coords={'time': ds.time, 'pressure': ds.pressure.sortby('pressure', ascending=False), 'cell': ds.cell, 'lat': ds.lat, 'lon': ds.lon},
@@ -147,10 +148,11 @@ def compute_chunk(chunk_idx, model, region, n_timesteps=None):
     desc_tv = virtual_temperature_from_dewpoint(desc_p, desc_t, desc_td)
     
     rho = (desc_p * 100) / (micro.R * desc_tv)
+    rho_out = rho.magnitude.astype(np.float32)
 
     dz = (-p_diffs / (rho[:, :-1, :] * micro.g)).magnitude  #inverse hydrostatic 
     z = np.concatenate([np.zeros((dz.shape[0], 1, dz.shape[2])), np.nancumsum(dz, axis=1)], axis=1)
-
+    z_out = z.astype(np.float32)
     
     # print('desc_td sample:', desc_td.magnitude[0, -1, 1000])
     # print('desc_tv sample:', desc_tv.magnitude[0, -1, 1000])
@@ -169,7 +171,7 @@ def compute_chunk(chunk_idx, model, region, n_timesteps=None):
     # print('n zero rh:', (desc_rh.magnitude == 0).sum())
     # print('n negative rh:', (desc_rh.magnitude < 0).sum())
 
-
+    
 
 
 
@@ -179,7 +181,9 @@ def compute_chunk(chunk_idx, model, region, n_timesteps=None):
     print('fmse sample:', fmse_out[0, -1, 1000])
 
     ds_out = xr.Dataset({
-        'fmse': xr.DataArray(fmse_out,          dims=['time', 'pressure', 'cell'])
+        'fmse': xr.DataArray(fmse_out,          dims=['time', 'pressure', 'cell']), 
+        'z':xr.DataArray(z_out,                 dims=['time', 'pressure', 'cell']), 
+        'rho':xr.DataArray(rho_out,                 dims=['time', 'pressure', 'cell'])
     })
 
     ds_out.to_zarr(zarr_path, region={'time': slice(t_start, t_end)})
