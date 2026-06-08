@@ -39,6 +39,7 @@ SBATCH_OPTS = {
 SCRIPT_CONFIGS = {
     'calc_fmse':     {'tag': 'fmse',     'zarr': 'fmse_{region}.zarr',     'script': 'calc_fmse.py'},
     'calc_mcs_fmse': {'tag': 'mcs_fmse', 'zarr': 'mcs_fmse_{region}.zarr', 'script': 'calc_mcs_fmse.py'},
+    'calc_mcs_env_updraft_fmse': {'tag': 'mcs_env_updraft_fmse', 'zarr': 'mcs_env_updraft_fmse_{region}.zarr', 'script': 'calc_mcs_env_updraft_fmse.py'}
 }
 
 def count_zarr_times(zarr_path):
