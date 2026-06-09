@@ -1,3 +1,18 @@
+""" Computes the per-track Becker and Hohenegger (2021) frozen MSE entrainment rate
+
+Usage: python compute_entrainment_rate.py --init --model <model_id> --region <region> (wam default)
+python compute_entrainment_rate.py --run --model <model_id> --region <region> (wam default)
+
+Output: 
+mcs_entr_rate_<region>.zarr 
+
+dims: tracks: ; times_3h: ; pressure: 
+
+currently no functionality to filter by surface, but should not be difficult to introduce
+
+"""
+
+
 import xarray as xr 
 import numpy as np 
 import src.models as models
@@ -89,6 +104,11 @@ def filter_surface(dstracks, surface):
     return filtered
 
 
+
+#-----------------------------------------------------------------------
+# Zarr store initialization 
+#-----------------------------------------------------------------------
+
 def init_zarr(model, region, dstracks_wam): 
     region_cfg = models.REGIONS[region]
     ds = open_region_dataset(model, region_cfg)
@@ -122,8 +142,11 @@ def init_zarr(model, region, dstracks_wam):
     done_dir.mkdir(parents=True, exist_ok=True)
     models.init_donefile(model, region, tag='mcs_entr_rate').touch()
     print(f'Created {zarr_path}  shape=({n_tracks}, {MAX_TIMES_3H}, {n_pressures})')
-    # print(f'Submit array 0-{n_chunks - 1}  ({n_chunks} jobs)  via: python submit.py --model {model}')
+    
 
+#-----------------------------------------------------------------------
+# Core computation
+#-----------------------------------------------------------------------
 
 def compute_entr_rate(ds):
     # mass flux weights
@@ -133,16 +156,16 @@ def compute_entr_rate(ds):
         return None
 
     # weighted mean fmse profile over all updraft cells and time
-    fmse_u = (ds.fmse_updraft * mass_flux).sum('cell') / mass_flux.sum('cell')  # (pressure,)
-    fmse_e = ds.fmse_env.mean('cell')   # (pressure,)
-    z_mean = ds.z_updraft.mean('cell')  # (pressure,)
+    fmse_u = (ds.fmse_updraft * mass_flux).sum('cell') / mass_flux.sum('cell')  
+    fmse_e = ds.fmse_env.mean('cell')   
+    z_mean = ds.z_updraft.mean('cell')  
 
     # convert to numpy for differentiation
-    fmse_u_np  = fmse_u.values  # (25,)
-    z_np       = z_mean.values  # (25,)
+    fmse_u_np  = fmse_u.values 
+    z_np       = z_mean.values  
 
-    dh_dz = np.gradient(fmse_u_np, z_np)  # (25,)
-    epsilon = -dh_dz / (fmse_u.values - fmse_e.values)  # (25,) in m^-1
+    dh_dz = np.gradient(fmse_u_np, z_np) 
+    epsilon = -dh_dz / (fmse_u.values - fmse_e.values)  
     
     return epsilon.astype(np.float32)
 
@@ -151,6 +174,8 @@ def compute_track_entrainment(ds, dstracks_wam, model, region):
     zarr_path     = models.data_dir(model) / f'mcs_entr_rate_{region}.zarr'
     n_tracks = dstracks_wam.sizes['tracks']
     n_pressures = ds.sizes['pressure']
+
+    ## logic from calc_mcs_entrainment.py in proxy_entrainment/
 
     max_label  = int(dstracks_wam.tracks.values.max()) + 1  # mask value = track_idx + 1
 
@@ -190,7 +215,7 @@ def compute_track_entrainment(ds, dstracks_wam, model, region):
 
             ds_track = ds_t.isel(cell=track_mask)
 
-            entr_rate = compute_entr_rate(ds_track)  # (pressure,)
+            entr_rate = compute_entr_rate(ds_track)
             if entr_rate is None:
                 continue
 
@@ -221,38 +246,6 @@ def compute_track_entrainment(ds, dstracks_wam, model, region):
 
 
 def main():
-    # Two modes:
-    #   --init --model <model> [--region <region>]   — initialise zarr store
-    #   <json_file> <task_index>                     — process one SLURM task
-
-    # if len(sys.argv) >= 3 and not sys.argv[1].startswith('-'):
-    #     # SLURM task mode: positional json_file task_index
-    #     json_file  = Path(sys.argv[1])
-    #     task_index = int(sys.argv[2])
-
-    #     if not json_file.exists():
-    #         sys.exit(f'Error: task file {json_file} not found')
-    
-    #     task_cfg   = json.loads(json_file.read_text())
-        
-    #     if task_index >= len(task_cfg['tasks']):
-    #         sys.exit(f'Error: task index {task_index} out of range')
-
-    #     model      = task_cfg['model']
-    #     region     = task_cfg['region']
-    #     chunk      = task_cfg['tasks'][task_index]['chunk']
-    #     region_cfg = models.REGIONS[region]
-
-        
-        
-        
-
-    #     dstracks         = load_track_stats()
-    #     dstracks_wam     = filter_region_tracks(dstracks, region_cfg)
-        # dstracks_wam     = filter_surface(dstracks_wam, args.surface)
-        # return
-
-    
 
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
