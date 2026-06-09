@@ -99,6 +99,8 @@ def main():
     parser.add_argument('--script', choices=SCRIPT_CONFIGS.keys(),
                         default='calc_fmse',
                         help='Which script to submit (default: calc_fmse)')
+    parser.add_argument('--radius', type=float, default=None,
+                    help='Environment radius in km (only for calc_env_updraft_fmse)')
     args = parser.parse_args()
 
     model, region = args.model, args.region
