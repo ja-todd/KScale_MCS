@@ -313,7 +313,7 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, n_timeste
 
         mcs_bool = mask_wam > 0
         if not mcs_bool.any():
-            continue  # no MCS at this timestep, leave as NaN
+            continue  # leave as NaN because no MCS here
         
         w_t = w_chunk.isel(time=i).compute().values
         qc_t = qc_chunk.isel(time=i).compute().values
@@ -332,14 +332,14 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, n_timeste
         original_cell_indices = np.where(mcs_bool)[0]
         updraft_original_indices = original_cell_indices[cell_indices]
 
-        fmse_t = fmse_ds.fmse.isel(time=fi).compute().values  # (pressure, cell)
+        fmse_t = fmse_ds.fmse.isel(time=fi).compute().values 
         z_t = fmse_ds.z.isel(time=fi).compute().values
         rho_t = fmse_ds.rho.isel(time=fi).compute().values
 
 
         fmse_updrafts = fmse_t[:, updraft_original_indices]   
         z_updrafts = z_t[:, updraft_original_indices] 
-        rho_updrafts = rho_t[:, updraft_original_indices]# (pressure, n_updrafts)
+        rho_updrafts = rho_t[:, updraft_original_indices]
         w_updrafts = w_t[:, updraft_original_indices]
         updraft_lats = fmse_ds.lat.isel(cell=updraft_original_indices).values
         updraft_lons = fmse_ds.lon.isel(cell=updraft_original_indices).values
@@ -352,7 +352,7 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, n_timeste
                                 fmse_ds.lat.values, fmse_ds.lon.values, updraft_bool)
 
 
-        ### write to output properly - unsure how 
+        
         fmse_updraft_out[i, :, updraft_original_indices]  = fmse_updrafts.T
         fmse_env_out[i, :, updraft_original_indices]      = fmse_env_per_updraft.T
         rho_updraft_out[i, :, updraft_original_indices]   = rho_updrafts.T

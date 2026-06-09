@@ -119,7 +119,7 @@ def compute_chunk(chunk_idx, model, region, n_timesteps=None):
 
     region_cfg = models.REGIONS[region]
     ds         = open_region_dataset(model, region_cfg)
-    zarr_path  = models.data_dir(model) / f'fmse_{region}.zarr'  ## check this 
+    zarr_path  = models.data_dir(model) / f'fmse_{region}.zarr' 
 
     t_start  = chunk_idx * CHUNK_SIZE
     t_end    = min(t_start + CHUNK_SIZE, ds.sizes['time'])
@@ -153,26 +153,6 @@ def compute_chunk(chunk_idx, model, region, n_timesteps=None):
     dz = (-p_diffs / (rho[:, :-1, :] * micro.g)).magnitude  #inverse hydrostatic 
     z = np.concatenate([np.zeros((dz.shape[0], 1, dz.shape[2])), np.nancumsum(dz, axis=1)], axis=1)
     z_out = z.astype(np.float32)
-    
-    # print('desc_td sample:', desc_td.magnitude[0, -1, 1000])
-    # print('desc_tv sample:', desc_tv.magnitude[0, -1, 1000])
-    # print('rho sample:', rho.magnitude[0, -1, 1000])
-    # print('dz sample:', dz[0, -1, 1000])
-    # print('z sample:', z[0, -1, 1000])
-    # print('desc_q sample:', desc_q[0, -1, 1000])
-    # print('desc_qi sample:', desc_qi[0, -1, 1000])
-
-    # find a cell where 1000 hPa is valid (z should be ~0)
-    
-
-
-    # print('desc_rh sample:', desc_rh.magnitude[0, -1, 1000])
-    # print('desc_rh min:', desc_rh.magnitude.min())
-    # print('n zero rh:', (desc_rh.magnitude == 0).sum())
-    # print('n negative rh:', (desc_rh.magnitude < 0).sum())
-
-    
-
 
 
     fmse_out = (micro.cp * desc_t.magnitude) + (micro.g * z) + (micro.Lv * desc_q) + (micro.Lf * desc_qi)
