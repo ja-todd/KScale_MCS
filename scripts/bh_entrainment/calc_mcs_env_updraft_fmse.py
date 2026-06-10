@@ -30,7 +30,9 @@ import intake
 from pathlib import Path 
 import easygems.healpix as egh 
 import src.models as models 
-from src.utils import haversine, open_region_dataset
+from src.utils import haversine, open_region_dataset, align_times,\
+                     compute_wam_positions
+                    
 import pandas as pd
 
 
@@ -41,174 +43,16 @@ warnings.filterwarnings('ignore', message='.*divide by zero encountered in log.*
 warnings.filterwarnings('ignore', message='.*invalid value encountered in divide.*', category=RuntimeWarning)
 
 CHUNK_SIZE = 10 
-MAX_TIMES_3H = 217
 
 ZOOM             = None
 MASK_URL         = None
-STATS_URL        = None
-FMSE_ZARR         = None
-
-
-#----------------------------------------------------------------------
-# Data loading 
-#----------------------------------------------------------------------
-
-def load_track_stats():
-    """Fetch PyFLEXTRKR track statistics from on disc."""
-    print('Loading MCS track statistics...')
-
-    ## commented out is the process if using S3 URL
-    # response = requests.get(STATS_URL, stream=True)
-    # dstracks = xr.open_dataset(BytesIO(response.content), mask_and_scale=True)  
-    dstracks = xr.open_dataset(STATS_URL, mask_and_scale=True)  ## used if the data on disk
-
-    # Round times to nearest second (small offset in source data)
-    def _round(t):
-        return (np.round(t.astype(int) / 1e9) * 1e9).astype('datetime64[ns]')
-
-    for field in ['base_time', 'start_basetime', 'end_basetime']:
-        dstracks[field].load()
-        tmask = ~np.isnan(dstracks[field].values)
-        dstracks[field].values[tmask] = _round(dstracks[field].values[tmask])
-
-    return dstracks
-
-
-def open_fmse():
-    """Open the local variable zarr store."""
-    print('Opening variable zarr...')
-    return xr.open_zarr(FMSE_ZARR)
-
-
-def open_mcs_mask():
-    """Open the MCS pixel mask zarr from storage on disc."""
-    print('Opening MCS mask zarr...')
-    return xr.open_zarr(MASK_URL, chunks={})
-
-def hp_mods(ds):
-    return ds.rename({'healpix_index': 'cell'}).pipe(egh.attach_coords)
-
-
-def _region_mask(ds, region_cfg):
-    """Boolean cell mask for the analysis region (handles lon wrap-around)."""
-    lon_min, lon_max = region_cfg['lon_min'], region_cfg['lon_max']
-    lat_min, lat_max = region_cfg['lat_min'], region_cfg['lat_max']
-    if lon_min > lon_max:   # region wraps across 0°/360°
-        lon_mask = (ds.lon > lon_min) | (ds.lon < lon_max)
-    else:
-        lon_mask = (ds.lon > lon_min) & (ds.lon < lon_max)
-    return lon_mask & (ds.lat > lat_min) & (ds.lat < lat_max)
-
-
-def open_region_dataset(model, region_cfg):
-    zoom = models.MODELS[model]['zoom']
-    cat  = intake.open_catalog(models.CATALOG_URL)['UK']
-    ds3h = cat[model](zoom=zoom, time='PT3H').to_dask().pipe(hp_mods)
-    return ds3h.isel(cell=_region_mask(ds3h, region_cfg))
-
 
 # ---------------------------------------------------------------------------
-# Preprocessing
+# Build initial zarr store 
 # ---------------------------------------------------------------------------
 
-def compute_wam_positions(var_ds, mask_ds):
-    """
-    Compute positional indices of WAM cells within the global mask cell array.
-    Returns an int array of shape (n_wam_cells,).
-    """
-    wam_cells    = var_ds.cell.values             # HEALPix cell numbers, WAM subset
-    global_cells = mask_ds.healpix_index.values    # HEALPix cell numbers, global (0…N-1)
 
-    # global_cells is 0,1,2,...,N-1 so positions == wam_cells, but use searchsorted
-    # for correctness in case of non-contiguous ranges.
-    # MM: explain searchsorted.
-    positions = np.searchsorted(global_cells, wam_cells)
-    assert np.all(global_cells[positions] == wam_cells), \
-        'WAM cell indices not found in global mask — zoom mismatch?'
-    return positions
-
-
-def filter_region_tracks(dstracks, region_cfg):
-    """
-    Keep only tracks whose centroid enters the analysis region (with buffer)
-    at any point during their lifetime.
-    """
-    display = region_cfg['display']
-    print(f'Filtering tracks to {display} region...')
-    dstracks.meanlat.load()
-    dstracks.meanlon.load()
-
-    lat   = dstracks.meanlat.values        # (tracks, times)
-    lon   = dstracks.meanlon.values        # (tracks, times), in [0, 360]
-    lon180 = (lon + 180) % 360 - 180      # convert to [-180, 180]
-
-    in_lat = (lat   > region_cfg['buf_lat_min']) & (lat   < region_cfg['buf_lat_max'])
-    in_lon = (lon180 > region_cfg['buf_lon_min']) & (lon180 < region_cfg['buf_lon_max'])
-    in_region = (in_lat & in_lon).any(axis=1)
-
-    filtered = dstracks.isel(tracks=in_region)
-    print(f'  {int(in_region.sum())} / {dstracks.sizes["tracks"]} tracks pass {display} filter')
-    return filtered
-
-LAND_FRAC_THRESHOLD  = 0.8   # mean pf_landfrac above this → land MCS
-OCEAN_FRAC_THRESHOLD = 0.2   # mean pf_landfrac below this → ocean MCS
-
-
-def filter_surface(dstracks, surface):
-    """
-    Filter tracks by mean land fraction (pf_landfrac, expressed as 0–1).
-      'land'  : mean pf_landfrac > 0.8
-      'ocean' : mean pf_landfrac < 0.2
-      'all'   : no filter (default)
-    """
-    if surface == 'all':
-        return dstracks
-
-    print(f'Filtering tracks by surface type: {surface}...')
-    dstracks.pf_landfrac.load()
-    mean_lf = np.nanmean(dstracks.pf_landfrac.values, axis=1)  # (tracks,)
-
-    if surface == 'land':
-        mask = mean_lf > LAND_FRAC_THRESHOLD
-    else:  # ocean
-        mask = mean_lf < OCEAN_FRAC_THRESHOLD
-
-    filtered = dstracks.isel(tracks=mask)
-    print(f'  {int(mask.sum())} / {dstracks.sizes["tracks"]} tracks pass {surface} filter')
-    return filtered
-
-
-
-def align_times(fmse_ds, mask_ds):
-    """
-    Find 3-hourly entrainment times that exist in the hourly mask dataset.
-    Returns:
-        times_3h   : 1-D array of datetime64 values (3-hourly, in overlap)
-        mask_indices: corresponding positional indices in mask_ds.time
-    """
-    var_times = fmse_ds.time.values
-    mask_times = mask_ds.time.values
-
-    mask_time_to_idx = {pd.Timestamp(t): i for i, t in enumerate(mask_times)}
-
-    overlap_fmse = []
-    overlap_mask_idx = []
-    for i, t in enumerate(var_times):
-        ts = pd.Timestamp(t)
-        if ts in mask_time_to_idx:
-            overlap_fmse.append(i)
-            overlap_mask_idx.append(mask_time_to_idx[ts])
-
-    print(f'Overlap: {len(overlap_fmse)} 3-hourly timesteps '
-          f'({pd.Timestamp(var_times[overlap_fmse[0]])} – '
-          f'{pd.Timestamp(var_times[overlap_fmse[-1]])})')
-
-    return (np.array(overlap_fmse),
-            np.array(overlap_mask_idx),
-            var_times[overlap_fmse])
-
-
-def init_zarr(model, region): 
+def init_zarr(model, region, radius): 
     region_cfg = models.REGIONS[region]
     ds = open_region_dataset(model, region_cfg)
 
@@ -238,18 +82,18 @@ def init_zarr(model, region):
         
     )
 
-    zarr_path = models.data_dir(model) / f'mcs_env_updraft_fmse_{region}.zarr'
+    zarr_path = models.data_dir(model) / f'mcs_env_updraft_fmse_{radius}km.zarr'
     zarr_path.parent.mkdir(parents=True, exist_ok=True) 
     template.to_zarr(zarr_path, mode='w', zarr_format=2)
 
     done_dir = models.done_dir(model)
     done_dir.mkdir(parents=True, exist_ok=True)
-    models.init_donefile(model, region, tag='mcs_env_updraft_fmse').touch()
+    models.init_donefile(model, region, tag=f'mcs_env_updraft_fmse_{radius}km').touch()
     print(f'Created {zarr_path}  shape=({n_times}, {n_pressures}, {n_cells})')
     print(f'Submit array 0-{n_chunks - 1}  ({n_chunks} jobs)  via: python submit.py --model {model}')
 
 def get_env_fmse(fmse_t, updraft_lats, updraft_lons, all_lats, all_lons, 
-                 updraft_bool, radius=50):
+                 updraft_bool, radius):
     """
     For each updraft cell, compute mean environment FMSE within radius.
     Returns fmse_env_per_updraft of shape (pressure, n_updrafts)
@@ -267,12 +111,12 @@ def get_env_fmse(fmse_t, updraft_lats, updraft_lons, all_lats, all_lons,
     return fmse_env_per_updraft  # (pressure, n_updrafts)
 
 
-def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, n_timesteps=None): 
-    done_file = models.chunk_donefile(model, chunk_idx, tag='mcs_env_updraft_fmse')
+def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, radius, n_timesteps=None): 
+    done_file = models.chunk_donefile(model, chunk_idx, tag=f'mcs_env_updraft_fmse_{radius}km')
     if done_file.exists():
         print(f'Chunk {chunk_idx} already done, skipping.')
         return
-    zarr_path     = models.data_dir(model) / f'mcs_env_updraft_fmse_{region}.zarr' 
+    zarr_path     = models.data_dir(model) / f'mcs_env_updraft_fmse_{radius}km.zarr' 
     
     wam_positions = compute_wam_positions(fmse_ds, mask_ds)
     fmse_idxs, mask_idxs, _ = align_times(fmse_ds, mask_ds)
@@ -349,7 +193,7 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, n_timeste
         updraft_bool[updraft_original_indices] = True
 
         fmse_env_per_updraft = get_env_fmse(fmse_t, updraft_lats, updraft_lons, 
-                                fmse_ds.lat.values, fmse_ds.lon.values, updraft_bool)
+                                fmse_ds.lat.values, fmse_ds.lon.values, updraft_bool, radius)
 
 
         
@@ -395,8 +239,10 @@ def main():
 
         model      = task_cfg['model']
         region     = task_cfg['region']
+        radius     = task_cfg['radius']
         chunk      = task_cfg['tasks'][task_index]['chunk']
         region_cfg = models.REGIONS[region]
+
 
         global MASK_URL, ZOOM
 
@@ -410,7 +256,7 @@ def main():
         
 
         compute_chunk(full_ds, fmse_ds, mask_ds, chunk, 
-                      model, region)  
+                      model, region, radius)  
         return
 
     parser = argparse.ArgumentParser(description=__doc__,
@@ -420,12 +266,14 @@ def main():
                        help='Create empty zarr store (run once, or let submit.py handle this)')
     parser.add_argument('--n-timesteps', type=int, default=None, metavar='N',
                         help='Limit timesteps processed (for testing)')
+    parser.add_argument('--radius', type=int, default=None,
+                    help='Environment radius in km (only for calc_env_updraft_fmse)')
     models.add_model_arg(parser)
     models.add_region_arg(parser)
     args = parser.parse_args()
 
     if args.init:
-        init_zarr(args.model, args.region)
+        init_zarr(args.model, args.region, args.radius)
 
 
 
