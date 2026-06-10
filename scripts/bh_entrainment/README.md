@@ -26,22 +26,20 @@ python submit.py --model <model_id> --region <region> --script calc_fmse
 
 #### This initializes the zarr store if needed, then submits the chunks which have absent donefiles. 
 
-### 2. Compute per-MCS-track updraft and environmental FMSE: NOTE: The current 'environment' is at radius = 50km from the updrafts (obviously not going to stick with that), but 10km seemed to be too strict and 
-### was returning NaN arrays a lot of the time. 
+### 2. Compute per-MCS-track updraft and environmental FMSE: NOTE: The default radius = 50km from the updrafts; 10km seemed to be too strict and \n  was returning NaN arrays a lot of the time. 
 
 ```
-python submit.py --model <model_id> --region <region> --script calc_mcs_env_updraft_fmse
+python submit.py --model <model_id> --region <region> --script calc_mcs_env_updraft_fmse --radius <radius(km)>
 
 ```
 
 #### Again, initializes a different zarr store and submits the chunks which have absent donefiles. 
 
-### 3. Compute the entrainment rate using the output zarr from calc_mcs_env_updraft_fmse.py
+### 3. Compute the entrainment rate using the output zarr from calc_mcs_env_updraft_fmse.py, with an environmental radius matching one of the chosen radii from above.
 
 ```
-python compute_entrainment_rate.py --run --model <model_id> --region <region> (wam default)
+python compute_entrainment_rate.py --run --model <model_id> --region <region> (wam default) --radius <radius(km)>
 
 ```
 #### Output: ```mcs_entr_rate_<region>.zarr```, dims: tracks: ; times_3h: ; pressure: currently no functionality to filter by surface, but should not be difficult to introduce. 
-#### I have tested the output from the RAL3 run, it looks reasonable and values are broadly comparable to Becker and Hohenegger (2021), their Fig 6.
 
