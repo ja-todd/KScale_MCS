@@ -16,100 +16,20 @@ currently no functionality to filter by surface, but should not be difficult to 
 import xarray as xr 
 import numpy as np 
 import src.models as models
-import sys
-import json
-from src.utils import open_region_dataset
+from src.utils import open_region_dataset, load_track_stats, filter_region_tracks, MAX_TIMES_3H
 import argparse
 from pathlib import Path
 import dask.array as dsa
 import pandas as pd
 
 # CHUNK_SIZE = 10 
-MAX_TIMES_3H = 217
-
-
-
-# ---------------------------------------------------------------------------
-# Preprocessing
-# ---------------------------------------------------------------------------
-
-
-def load_track_stats():
-    """Fetch PyFLEXTRKR track statistics from S3."""
-    print('Loading MCS track statistics...')
-    # response = requests.get(STATS_URL, stream=True)
-    # dstracks = xr.open_dataset(BytesIO(response.content), mask_and_scale=True)
-    dstracks = xr.open_dataset(STATS_URL, mask_and_scale=True)  ## used if the data on disk
-
-    # Round times to nearest second (small offset in source data)
-    def _round(t):
-        return (np.round(t.astype(int) / 1e9) * 1e9).astype('datetime64[ns]')
-
-    for field in ['base_time', 'start_basetime', 'end_basetime']:
-        dstracks[field].load()
-        tmask = ~np.isnan(dstracks[field].values)
-        dstracks[field].values[tmask] = _round(dstracks[field].values[tmask])
-
-    return dstracks
-
-
-def filter_region_tracks(dstracks, region_cfg):
-    """
-    Keep only tracks whose centroid enters the analysis region (with buffer)
-    at any point during their lifetime.
-    """
-    display = region_cfg['display']
-    print(f'Filtering tracks to {display} region...')
-    dstracks.meanlat.load()
-    dstracks.meanlon.load()
-
-    lat   = dstracks.meanlat.values        # (tracks, times)
-    lon   = dstracks.meanlon.values        # (tracks, times), in [0, 360]
-    lon180 = (lon + 180) % 360 - 180      # convert to [-180, 180]
-
-    in_lat = (lat   > region_cfg['buf_lat_min']) & (lat   < region_cfg['buf_lat_max'])
-    in_lon = (lon180 > region_cfg['buf_lon_min']) & (lon180 < region_cfg['buf_lon_max'])
-    in_region = (in_lat & in_lon).any(axis=1)
-
-    filtered = dstracks.isel(tracks=in_region)
-    print(f'  {int(in_region.sum())} / {dstracks.sizes["tracks"]} tracks pass {display} filter')
-    return filtered
-
-
-LAND_FRAC_THRESHOLD  = 0.8   # mean pf_landfrac above this → land MCS
-OCEAN_FRAC_THRESHOLD = 0.2   # mean pf_landfrac below this → ocean MCS
-
-
-def filter_surface(dstracks, surface):
-    """
-    Filter tracks by mean land fraction (pf_landfrac, expressed as 0–1).
-      'land'  : mean pf_landfrac > 0.8
-      'ocean' : mean pf_landfrac < 0.2
-      'all'   : no filter (default)
-    """
-    if surface == 'all':
-        return dstracks
-
-    print(f'Filtering tracks by surface type: {surface}...')
-    dstracks.pf_landfrac.load()
-    mean_lf = np.nanmean(dstracks.pf_landfrac.values, axis=1)  # (tracks,)
-
-    if surface == 'land':
-        mask = mean_lf > LAND_FRAC_THRESHOLD
-    else:  # ocean
-        mask = mean_lf < OCEAN_FRAC_THRESHOLD
-
-    filtered = dstracks.isel(tracks=mask)
-    print(f'  {int(mask.sum())} / {dstracks.sizes["tracks"]} tracks pass {surface} filter')
-    return filtered
-
 
 
 #-----------------------------------------------------------------------
 # Zarr store initialization 
 #-----------------------------------------------------------------------
 
-def init_zarr(model, region, dstracks_wam): 
+def init_zarr(model, region, dstracks_wam, radius=50): 
     region_cfg = models.REGIONS[region]
     ds = open_region_dataset(model, region_cfg)
 
@@ -134,13 +54,13 @@ def init_zarr(model, region, dstracks_wam):
     },
     coords={'tracks': dstracks_wam.tracks, 'pressure': ds.pressure.sortby('pressure', ascending=False)})
 
-    zarr_path = models.data_dir(model) / f'mcs_entr_rate_{region}.zarr'
+    zarr_path = models.data_dir(model) / f'mcs_entr_rate_{region}_{radius}km.zarr'
     zarr_path.parent.mkdir(parents=True, exist_ok=True) 
     template.to_zarr(zarr_path, mode='w', zarr_format=2)
 
     done_dir = models.done_dir(model)
     done_dir.mkdir(parents=True, exist_ok=True)
-    models.init_donefile(model, region, tag='mcs_entr_rate').touch()
+    models.init_donefile(model, region, tag=f'mcs_entr_rate_{radius}km').touch()
     print(f'Created {zarr_path}  shape=({n_tracks}, {MAX_TIMES_3H}, {n_pressures})')
     
 
@@ -170,8 +90,8 @@ def compute_entr_rate(ds):
     return epsilon.astype(np.float32)
 
 
-def compute_track_entrainment(ds, dstracks_wam, model, region): 
-    zarr_path     = models.data_dir(model) / f'mcs_entr_rate_{region}.zarr'
+def compute_track_entrainment(ds, dstracks_wam, model, region, radius=50): 
+    zarr_path     = models.data_dir(model) / f'mcs_entr_rate_{region}_{radius}km.zarr'
     n_tracks = dstracks_wam.sizes['tracks']
     n_pressures = ds.sizes['pressure']
 
@@ -256,6 +176,8 @@ def main():
                        help='Compute the entrainment rates')
     parser.add_argument('--n-timesteps', type=int, default=None, metavar='N',
                         help='Limit timesteps processed (for testing)')
+    parser.add_argument('--radius', type=int, default=50, metavar='N', 
+                        help='radius in km to select from')
     models.add_model_arg(parser)
     models.add_region_arg(parser)
     args = parser.parse_args()
@@ -264,22 +186,22 @@ def main():
     STATS_URL = models.stats_url(args.model)
 
     if args.init:
-        dstracks     = load_track_stats()
+        dstracks     = load_track_stats(STATS_URL)
         region_cfg   = models.REGIONS[args.region]
         dstracks_wam = filter_region_tracks(dstracks, region_cfg)
-        init_zarr(args.model, args.region, dstracks_wam)
+        init_zarr(args.model, args.region, dstracks_wam, args.radius)
 
 
     if args.run: 
-        dstracks     = load_track_stats()
+        dstracks     = load_track_stats(STATS_URL)
         region_cfg   = models.REGIONS[args.region]
         dstracks_wam = filter_region_tracks(dstracks, region_cfg)
-        init_zarr(args.model, args.region, dstracks_wam)
+        # init_zarr(args.model, args.region, dstracks_wam, args.radius)
 
         print("Opening and computing zarr ....")
-        ds = xr.open_zarr(models.data_dir(args.model) / f'mcs_env_updraft_fmse_{args.region}.zarr').compute()
+        ds = xr.open_zarr(models.data_dir(args.model) / f'mcs_env_updraft_fmse_{args.radius}km.zarr').compute()
         print("Computing track entrainment")
-        compute_track_entrainment(ds, dstracks_wam, args.model, args.region)
+        compute_track_entrainment(ds, dstracks_wam, args.model, args.region, args.radius)
 
 
 if __name__ == '__main__':
