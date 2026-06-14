@@ -13,3 +13,4 @@ mse_notebook.ipynb
 test_mcs_tracks.ipynb
 mcs_track_healpix_UM.ipynbtesting_mcs_mask.ipynb
 *.ipynb
+comp_entr_rate.sh

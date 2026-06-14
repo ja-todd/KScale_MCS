@@ -15,8 +15,8 @@ currently no functionality to filter by surface, but should not be difficult to 
 
 import xarray as xr 
 import numpy as np 
-import src.models as models
-from src.utils import open_region_dataset, load_track_stats, filter_region_tracks, MAX_TIMES_3H
+import src.hp_models as models
+from src.hp_utils import open_region_dataset, load_track_stats, filter_region_tracks, MAX_TIMES_3H
 import argparse
 from pathlib import Path
 import dask.array as dsa

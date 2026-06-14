@@ -29,8 +29,8 @@ import sys
 import intake 
 from pathlib import Path 
 import easygems.healpix as egh 
-import src.models as models 
-from src.utils import haversine, open_region_dataset, align_times,\
+import src.hp_models as models 
+from src.hp_utils import haversine, open_region_dataset, align_times,\
                      compute_wam_positions
                     
 import pandas as pd
