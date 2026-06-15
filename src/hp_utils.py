@@ -4,7 +4,7 @@ import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import src.models as models
+import src.hp_models as models
 import intake
 import easygems.healpix as egh
 import warnings
