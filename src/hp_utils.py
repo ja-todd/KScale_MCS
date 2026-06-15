@@ -89,8 +89,9 @@ def _region_mask(ds, region_cfg):
 
 def open_region_dataset(model, region_cfg):
     zoom = models.MODELS[model]['zoom']
+    catalog_model_key = models.MODELS[model].get('catalog_key', model)
     cat  = intake.open_catalog(models.CATALOG_URL)['UK']
-    ds3h = cat[model](zoom=zoom, time='PT3H').to_dask().pipe(hp_mods)
+    ds3h = cat[catalog_model_key](zoom=zoom, time='PT3H').to_dask().pipe(hp_mods)
     return ds3h.isel(cell=_region_mask(ds3h, region_cfg))
 
 

@@ -22,10 +22,31 @@ DATE_RANGE  = '20200201.0000_20210301.0000'
 
 # Four global UM models with PyFLEXTRKR tracking data at HEALPix zoom=9.
 MODELS = {
-    'um_glm_n2560_RAL3p3_tuned_hk26': {'zoom': 9, 'display': 'UM N2560 RAL3.3'},
+    ## zoom 9 models 
+    'um_glm_n2560_RAL3p3_tuned_hk26': {'zoom': 9,  'catalog_key': 'um_glm_n2560_RAL3p3_tuned_hk26', 'display': 'UM N2560 RAL3.3'},
     'um_glm_n2560_CoMA9_hk26':         {'zoom': 9, 'display': 'UM N2560 CoMA9'},
     'um_glm_n1280_GAL9_v2_hk26':       {'zoom': 9, 'display': 'UM N1280 GAL9'},
     'um_glm_n1280_CoMA9_hk26':         {'zoom': 9, 'display': 'UM N1280 CoMA9'},
+    ## zoom 10 models 
+    'um_glm_n2560_RAL3p3_tuned_sahel_z10_t40k': {'zoom': 10, 'catalog_key': 'um_glm_n2560_RAL3p3_tuned_hk26', 
+                                    'display':'UM N2560 RAL3.3 SAHEL Z10 40000km2',
+
+                            'mask_path': '/work/scratch-nopw2/mmuetz/hk26/hk26-MCS/tracking/um_glm_n2560_RAL3p3_tuned_sahel_z10/mcstracking/mcs_mask_hphp10_v1_20200201.0000_20210301.0000.zarr',
+
+                                    'stats_path': ('/work/scratch-nopw2/mmuetz/'
+                    'hk26/hk26-MCS/tracking/um_glm_n2560_RAL3p3_tuned_sahel_z10/'
+                        'stats/mcs_tracks_final_20200201.0000_20210301.0000.nc'),
+                                                }, 
+
+    'um_glm_n2560_RAL3p3_tuned_sahel_z10_t4k': {'zoom': 10, 'catalog_key': 'um_glm_n2560_RAL3p3_tuned_hk26', 
+                                    'display':'UM N2560 RAL3.3 SAHEL Z10 4000km2', 
+                                    'mask_path': ('/work/scratch-nopw2/mmuetz/hk26/hk26-MCS/tracking/'
+                                        'um_glm_n2560_RAL3p3_tuned_sahel_z10_area4000/'
+                                        'mcstracking/mcs_mask_hphp10_v1_20200201.0000_20210301.0000.zarr'),
+                                    'stats_path': ('/work/scratch-nopw2/mmuetz/hk26/hk26-MCS/tracking/'
+                                        'um_glm_n2560_RAL3p3_tuned_sahel_z10_area4000/stats/'
+                                            'mcs_tracks_final_20200201.0000_20210301.0000.nc'),
+                                                }
 }
 
 # Analysis regions.  lon_min/lon_max are in [0, 360]; if lon_min > lon_max the
@@ -52,12 +73,16 @@ def _pyflex_key(model):
 
 
 def mask_url(model):
+    if 'mask_path' in MODELS[model]:
+        return MODELS[model]['mask_path']
     zoom = MODELS[model]['zoom']
     return (f'{TRACK_DIR}/{_pyflex_key(model)}/mcstracking/'
             f'mcs_mask_hp{zoom}_{DATE_RANGE}.zarr')
 
 
 def stats_url(model):
+    if 'stats_path' in MODELS[model]:
+        return MODELS[model]['stats_path']
     return (f'{TRACK_DIR}/{_pyflex_key(model)}/stats/'
             f'mcs_tracks_final_{DATE_RANGE}.nc')
 
@@ -67,7 +92,9 @@ def stats_url(model):
 # ---------------------------------------------------------------------------
 
 def data_dir(model):
-    return Path('/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data') / model
+    if 'mask_path' in MODELS[model]: ## probably not a permanent fix 
+        return Path('/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data/z10') / model
+    return Path('/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data/z9') / model
 
 
 def figs_dir(model):
