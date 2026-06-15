@@ -35,11 +35,11 @@ python submit.py --model <model_id> --region <region> --script calc_mcs_env_updr
 
 #### Again, initializes a different zarr store and submits the chunks which have absent donefiles. 
 
-### 3. Compute the entrainment rate using the output zarr from calc_mcs_env_updraft_fmse.py, with an environmental radius matching one of the chosen radii from above.
+### 3. Compute the entrainment rate using the output zarr from calc_mcs_env_updraft_fmse.py, with an environmental radius matching one of the chosen radii from above, and can filter to a specific surface (land/ocean/all, default=all)
 
 ```
-python compute_entrainment_rate.py --run --model <model_id> --region <region> (wam default) --radius <radius(km)>
+python compute_entrainment_rate.py --run --model <model_id> --region <region> (wam default) --radius <radius(km)> --surface <surface>
 
 ```
-#### Output: ```mcs_entr_rate_<region>.zarr```, dims: tracks: ; times_3h: ; pressure: currently no functionality to filter by surface, but should not be difficult to introduce. 
+#### Output: ```mcs_entr_rate_<region>_<radius>_[<surface>].zarr```, dims: tracks: ; times_3h: ; pressure:  
 
