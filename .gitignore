@@ -11,3 +11,5 @@ slurm/
 figs/
 scripts/bh_entrainment/healpix/notebooks/
 comp_entr_rate.sh
+run_updraft_jobs.sh
+.vscode
