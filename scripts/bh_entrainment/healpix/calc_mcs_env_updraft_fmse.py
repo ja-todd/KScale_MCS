@@ -149,11 +149,16 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, radius, n
     qc_chunk = ql_chunk + qi_chunk 
 
     for fi, mi in zip(fmse_idxs_chunk, mask_idxs_chunk):
+        
         i = fi - t_start
+        print(f"Chunk {chunk_idx}: starting timestep {i} fi={fi}")
 
+        print("getting global mask")
         mask_global = mask_ds.mcs_mask.isel(time=mi).compute().values
         mask_global = np.nan_to_num(mask_global, nan=0.0)
         mask_wam    = mask_global[wam_positions].astype(np.int32)
+
+        print("got global mask")
 
         mcs_bool = mask_wam > 0
         if not mcs_bool.any():
@@ -165,29 +170,58 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, radius, n
         w_mcs = w_t[:, mcs_bool]
         qc_mcs = qc_t[:, mcs_bool]
 
-        w_mask = w_mcs > 1
-        qc_mask = qc_mcs > 1e-5
+        w_updraft_threshold  = 1
+        qc_updraft_threshold = 1e-5
+
+        w_mask       = w_mcs > w_updraft_threshold
+        qc_mask      = qc_mcs > qc_updraft_threshold
         updraft_mask = w_mask & qc_mask
 
 
         cell_updraft = updraft_mask.any(axis=0)
         cell_indices = np.where(cell_updraft)[0]
 
-        original_cell_indices = np.where(mcs_bool)[0]
-        updraft_original_indices = original_cell_indices[cell_indices]
+        original_cell_indices    = np.where(mcs_bool)[0]
+        updraft_original_indices = original_cell_indices[cell_indices]  ## cell positions of the updrafts on original region grid
 
-        fmse_t = fmse_ds.fmse.isel(time=fi).compute().values 
-        z_t = fmse_ds.z.isel(time=fi).compute().values
-        rho_t = fmse_ds.rho.isel(time=fi).compute().values
+        p_levs = fmse_ds.pressure.values
+        p500_idx = np.where(p_levs == 500)[0].item(0)
+        w_500 = w_t[p500_idx, :]
+        qc_500 = qc_t[p500_idx, :]
+        
 
+        deep_updraft_mask = np.zeros(len(updraft_original_indices), dtype=bool)
 
-        fmse_updrafts = fmse_t[:, updraft_original_indices]   
-        z_updrafts = z_t[:, updraft_original_indices] 
-        rho_updrafts = rho_t[:, updraft_original_indices]
-        w_updrafts = w_t[:, updraft_original_indices]
         updraft_lats = fmse_ds.lat.isel(cell=updraft_original_indices).values
         updraft_lons = fmse_ds.lon.isel(cell=updraft_original_indices).values
 
+        for idx, (lat, lon) in enumerate(zip(updraft_lats, updraft_lons)): 
+            dist = haversine(lat, lon, fmse_ds.lat.values, fmse_ds.lon.values)
+            nearby = dist <= 10
+
+            if ((w_500[nearby] > w_updraft_threshold) & (qc_500[nearby] > qc_updraft_threshold)).any(): 
+                deep_updraft_mask[idx] = True
+
+        updraft_original_indices = updraft_original_indices[deep_updraft_mask]
+
+        if len(updraft_original_indices) == 0:
+            continue
+        
+        updraft_lats = fmse_ds.lat.isel(cell=updraft_original_indices).values
+        updraft_lons = fmse_ds.lon.isel(cell=updraft_original_indices).values
+
+        
+
+        fmse_t = fmse_ds.fmse.isel(time=fi).compute().values 
+        z_t    = fmse_ds.z.isel(time=fi).compute().values
+        rho_t  = fmse_ds.rho.isel(time=fi).compute().values
+
+        fmse_updrafts = fmse_t[:, updraft_original_indices]   
+        z_updrafts    = z_t[:, updraft_original_indices] 
+        rho_updrafts  = rho_t[:, updraft_original_indices]
+        w_updrafts    = w_t[:, updraft_original_indices]
+        
+        
 
         updraft_bool = np.zeros(n_cells, dtype=bool)
         updraft_bool[updraft_original_indices] = True
@@ -212,8 +246,12 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, radius, n
         'w_updraft': xr.DataArray(w_updraft_out,          dims=['time', 'pressure', 'cell']),
         'track_id': xr.DataArray(track_id_out, dims=['time', 'cell'])
     })
+    
+    print(f"Chunk {chunk_idx}: before to_zarr")
 
     ds_out.to_zarr(zarr_path, region={'time': slice(t_start, t_end)})
+
+    print(f"Chunk {chunk_idx}: after to_zarr")
 
     done_file.touch()
     print(f'Chunk {chunk_idx} written')
