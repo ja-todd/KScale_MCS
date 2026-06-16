@@ -14,7 +14,10 @@ warnings.filterwarnings('ignore', message='.*The return type of `Dataset.dims`.*
 
 def hp_mods(ds):
     """Convert from CF-compliant to be compatible with egh, and attach lat/lon coords"""
-    return ds.rename({'healpix_index': 'cell'}).pipe(egh.attach_coords)
+    if 'healpix_index' in list(ds.dims): 
+        return ds.rename({'healpix_index': 'cell'}).pipe(egh.attach_coords)
+    else: 
+        return ds.pipe(egh.attach_coords)
 
 
 def plot_all_fields(ds_plot):
@@ -173,7 +176,10 @@ def compute_wam_positions(var_ds, mask_ds):
     Returns an int array of shape (n_wam_cells,).
     """
     wam_cells    = var_ds.cell.values             # HEALPix cell numbers, WAM subset
-    global_cells = mask_ds.healpix_index.values    # HEALPix cell numbers, global (0…N-1)
+    if 'healpix_index' in list(mask_ds.dims): 
+        global_cells = mask_ds.healpix_index.values    # HEALPix cell numbers, global (0…N-1)
+    else: 
+        global_cells = mask_ds.cell.values
 
     # global_cells is 0,1,2,...,N-1 so positions == wam_cells, but use searchsorted
     # for correctness in case of non-contiguous ranges.
