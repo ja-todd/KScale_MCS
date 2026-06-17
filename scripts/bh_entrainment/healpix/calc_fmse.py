@@ -18,7 +18,7 @@ from pathlib import Path
 import easygems.healpix as egh 
 import src.hp_models as models 
 from src.hp_utils import open_region_dataset
-import microphysics as micro
+import src. microphysics as micro
 from metpy.calc import dewpoint_from_relative_humidity, virtual_temperature_from_dewpoint
 from metpy.units import units 
 
