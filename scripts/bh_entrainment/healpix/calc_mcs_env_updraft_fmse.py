@@ -133,7 +133,8 @@ def get_env_fmse(fmse_t, updraft_lats, updraft_lons, all_lats, all_lons,
     return fmse_env_per_updraft # (pressure, n_updrafts)
 
 
-def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx, model, region, radius, n_timesteps=None):
+def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
+                          model, region, radius, n_timesteps=None, w_updraft_threshold=1, qc_updraft_threshold=1e-5):
     done_file = models.chunk_donefile(model, chunk_idx, tag=f'env_updraft_fmse_{radius}km')
     if done_file.exists():
         print(f'Chunk {chunk_idx} already done, skipping.')
@@ -174,12 +175,8 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx, model, region, radius, n_t
     all_lons = fmse_ds.lon.values
 
     for fi in fmse_idxs_chunk: 
-        # i = fi - t_start
         w_t = w_chunk.isel(time=fi).compute().values
         qc_t = qc_chunk.isel(time=fi).compute().values
-
-        w_updraft_threshold  = 1
-        qc_updraft_threshold = 1e-5
 
         w_mask       = w_t > w_updraft_threshold
         qc_mask      = qc_t > qc_updraft_threshold
@@ -258,7 +255,8 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx, model, region, radius, n_t
     print(f'Chunk {chunk_idx} written')
 
 
-def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, radius, n_timesteps=None): 
+def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
+                   model, region, radius, n_timesteps=None, w_updraft_threshold=1, qc_updraft_threshold=1e-5): 
     done_file = models.chunk_donefile(model, chunk_idx, tag=f'mcs_env_updraft_fmse_{radius}km')
     if done_file.exists():
         print(f'Chunk {chunk_idx} already done, skipping.')
@@ -322,9 +320,6 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx, model, region, radius, n
 
         w_mcs = w_t[:, mcs_bool]
         qc_mcs = qc_t[:, mcs_bool]
-
-        w_updraft_threshold  = 1
-        qc_updraft_threshold = 1e-5
 
         w_mask       = w_mcs > w_updraft_threshold
         qc_mask      = qc_mcs > qc_updraft_threshold
@@ -445,7 +440,7 @@ def main():
         if mcs:
             compute_chunk(full_ds, fmse_ds, mask_ds, chunk, model, region, radius)
         else:
-            compute_chunk_no_mcs(full_ds, fmse_ds, mask_ds, chunk, model, region, radius)     # <-- passed through
+            compute_chunk_no_mcs(full_ds, fmse_ds, chunk, model, region, radius)     # <-- passed through
         return
 
     parser = argparse.ArgumentParser(description=__doc__,
