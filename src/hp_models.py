@@ -24,9 +24,9 @@ DATE_RANGE  = '20200201.0000_20210301.0000'
 MODELS = {
     ## zoom 9 models 
     'um_glm_n2560_RAL3p3_tuned_hk26': {'zoom': 9,  'catalog_key': 'um_glm_n2560_RAL3p3_tuned_hk26', 'display': 'UM N2560 RAL3.3'},
-    'um_glm_n2560_CoMA9_hk26':         {'zoom': 9, 'display': 'UM N2560 CoMA9'},
-    'um_glm_n1280_GAL9_v2_hk26':       {'zoom': 9, 'display': 'UM N1280 GAL9'},
-    'um_glm_n1280_CoMA9_hk26':         {'zoom': 9, 'display': 'UM N1280 CoMA9'},
+    'um_glm_n2560_CoMA9_hk26':         {'zoom': 9, 'catalog_key': 'um_glm_n2560_CoMA9_hk26', 'display': 'UM N2560 CoMA9'},
+    'um_glm_n1280_GAL9_v2_hk26':       {'zoom': 9,'catalog_key': 'um_glm_n1280_GAL9_v2_hk26', 'display': 'UM N1280 GAL9'},
+    'um_glm_n1280_CoMA9_hk26':         {'zoom': 9,'catalog_key': 'um_glm_n1280_CoMA9_hk26', 'display': 'UM N1280 CoMA9'},
     ## zoom 10 models 
     'um_glm_n2560_RAL3p3_tuned_sahel_z10_t40k': {'zoom': 10, 'catalog_key': 'um_glm_n2560_RAL3p3_tuned_hk26', 
                                     'display':'UM N2560 RAL3.3 SAHEL Z10 40000km2',

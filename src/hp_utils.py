@@ -100,9 +100,18 @@ def open_region_dataset(model, region_cfg):
 
 def open_region_1h_dataset(model, region_cfg):
     zoom = models.MODELS[model]['zoom']
+    catalog_model_key = models.MODELS[model].get('catalog_key', model)
     cat  = intake.open_catalog(models.CATALOG_URL)['UK']
-    ds1h = cat[model](zoom=zoom, time='PT1H').to_dask().pipe(hp_mods)
+    ds1h = cat[catalog_model_key](zoom=zoom, time='PT1H').to_dask().pipe(hp_mods)
     return ds1h.isel(cell=_region_mask(ds1h, region_cfg))
+
+
+def open_1h_dataset(model):
+    zoom = models.MODELS[model]['zoom']
+    catalog_model_key = models.MODELS[model].get('catalog_key', model)
+    cat  = intake.open_catalog(models.CATALOG_URL)['UK']
+    ds1h = cat[catalog_model_key](zoom=zoom, time='PT1H').to_dask().pipe(hp_mods)
+    return ds1h
 
 
 #----------------------------------------------------------------------
