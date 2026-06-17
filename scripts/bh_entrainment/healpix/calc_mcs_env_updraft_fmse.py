@@ -27,7 +27,7 @@ import dask.array as dsa
 import warnings
 import sys
 from pathlib import Path 
-import easygems.healpix as egh 
+import src.microphysics as micro
 import src.hp_models as models 
 from src.hp_utils import haversine, open_region_dataset, align_times,\
                      compute_wam_positions
@@ -235,7 +235,7 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
         rho_env_per_updraft = get_env_field(rho_t, updraft_lats, updraft_lons, 
                                 all_lats, all_lons, updraft_bool, radius)
         
-        updraft_buoyancy = 9.81 * ((rho_env_per_updraft - rho_updrafts) / rho_updrafts)
+        updraft_buoyancy = micro.g * ((rho_env_per_updraft - rho_updrafts) / rho_updrafts)
         
         fmse_updraft_out[fi, :, where_updraft]  = fmse_updrafts.T
         fmse_env_out[fi, :, where_updraft]      = fmse_env_per_updraft.T
@@ -394,7 +394,7 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
         rho_env_per_updraft = get_env_field(rho_t, updraft_lats, updraft_lons, 
                                 all_lats, all_lons, updraft_bool, radius)
         
-        updraft_buoyancy = 9.81 * ((rho_env_per_updraft - rho_updrafts) / rho_updrafts)
+        updraft_buoyancy = micro.g * ((rho_env_per_updraft - rho_updrafts) / rho_updrafts)
 
 
         
