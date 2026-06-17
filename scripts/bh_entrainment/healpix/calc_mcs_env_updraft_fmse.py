@@ -66,7 +66,8 @@ def init_zarr(model, region, radius, mcs=True):
         'z_updraft':            xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs={'units': 'm'}),
         'rho_updraft':          xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs={'units': 'kg m-3'}),
         'w_updraft':            xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs={'units': 'm s-1'}),
-        'updraft_mass_flux':    xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs={'units': 'kg m-2 s-1'})
+        'updraft_mass_flux':    xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs={'units': 'kg m-2 s-1'}),
+        'updraft_buoyancy':    xr.DataArray(template_data, dims=['time', 'pressure', 'cell'], attrs={'units': 'm s-2'})
     }
 
     common_coords = {'time': ds.time, 'pressure': ds.pressure.sortby('pressure', ascending=False), 
@@ -96,15 +97,16 @@ def init_zarr(model, region, radius, mcs=True):
     print(f'Created {zarr_path}  shape=({n_times}, {n_pressures}, {n_cells})')
     print(f'Submit array 0-{n_chunks - 1}  ({n_chunks} jobs)  via: python submit.py --model {model}')
 
-def get_env_fmse(fmse_t, updraft_lats, updraft_lons, all_lats, all_lons, 
+
+def get_env_field(field_t, updraft_lats, updraft_lons, all_lats, all_lons, 
                  updraft_bool, radius, batch_size=100):
     """
     For each updraft cell, compute mean environment FMSE within radius.
     Returns fmse_env_per_updraft of shape (pressure, n_updrafts)
     """
     n_updrafts = len(updraft_lats)
-    n_pressure = fmse_t.shape[0]
-    fmse_env_per_updraft = np.full((n_pressure, n_updrafts), np.nan, dtype=np.float32)
+    n_pressure = field_t.shape[0]
+    field_env_per_updraft = np.full((n_pressure, n_updrafts), np.nan, dtype=np.float32)
     
     for start in range(0, n_updrafts, batch_size): 
         end=min(start + batch_size, n_updrafts)
@@ -122,15 +124,16 @@ def get_env_fmse(fmse_t, updraft_lats, updraft_lons, all_lats, all_lons,
         no_env_matrix = ~env_matrix.any(axis=1)
 
         env_mask = np.where(env_matrix[None, :, :], 
-                            fmse_t[:, None, :], np.nan)
+                            field_t[:, None, :], np.nan)
 
         batch_env_mean = np.nanmean(env_mask, axis=2)
 
         batch_env_mean[:, no_env_matrix] = np.nan
 
-        fmse_env_per_updraft[:, start:end] = batch_env_mean
+        field_env_per_updraft[:, start:end] = batch_env_mean
 
-    return fmse_env_per_updraft # (pressure, n_updrafts)
+    return field_env_per_updraft # (pressure, n_updrafts)
+
 
 
 def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
@@ -159,7 +162,7 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
     rho_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
     w_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
     updraft_mass_flux_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-
+    updraft_buoyancy_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
 
     in_chunk        = (fmse_idxs >= t_start) & (fmse_idxs < t_end)
     fmse_idxs_chunk = fmse_idxs[in_chunk]
@@ -226,8 +229,13 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
         updraft_bool = np.zeros(n_cells, dtype=bool)
         updraft_bool[where_updraft] = True
 
-        fmse_env_per_updraft = get_env_fmse(fmse_t, updraft_lats, updraft_lons, 
+        fmse_env_per_updraft = get_env_field(fmse_t, updraft_lats, updraft_lons, 
                                 all_lats, all_lons, updraft_bool, radius)
+        
+        rho_env_per_updraft = get_env_field(rho_t, updraft_lats, updraft_lons, 
+                                all_lats, all_lons, updraft_bool, radius)
+        
+        updraft_buoyancy = 9.81 * ((rho_env_per_updraft - rho_updrafts) / rho_updrafts)
         
         fmse_updraft_out[fi, :, where_updraft]  = fmse_updrafts.T
         fmse_env_out[fi, :, where_updraft]      = fmse_env_per_updraft.T
@@ -235,6 +243,7 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
         z_updraft_out[fi, :, where_updraft]     = z_updrafts.T
         w_updraft_out[fi, :, where_updraft]     = w_updrafts.T
         updraft_mass_flux_out[fi, :, where_updraft] = updraft_mass_fluxes.T
+        updraft_buoyancy_out[fi, :, where_updraft] = updraft_buoyancy.T
 
     ds_out = xr.Dataset({
         'fmse_env': xr.DataArray(fmse_env_out,          dims=['time', 'pressure', 'cell']),
@@ -243,6 +252,7 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
         'rho_updraft': xr.DataArray(rho_updraft_out,          dims=['time', 'pressure', 'cell']),
         'w_updraft': xr.DataArray(w_updraft_out,          dims=['time', 'pressure', 'cell']),
         'updraft_mass_flux': xr.DataArray(updraft_mass_flux_out,          dims=['time', 'pressure', 'cell']),
+        'updraft_buoyancy': xr.DataArray(updraft_buoyancy_out,          dims=['time', 'pressure', 'cell']),
     })
     
     print(f"Chunk {chunk_idx}: before to_zarr")
@@ -283,6 +293,7 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
     rho_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
     w_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
     updraft_mass_flux_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    updraft_buoyancy_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
     track_id_out = np.full((n_chunk, n_cells), np.nan, dtype=np.float32)
 
     in_chunk        = (fmse_idxs >= t_start) & (fmse_idxs < t_end)
@@ -377,18 +388,24 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
         updraft_bool = np.zeros(n_cells, dtype=bool)
         updraft_bool[where_mcs_updraft] = True
 
-        fmse_env_per_updraft = get_env_fmse(fmse_t, updraft_lats, updraft_lons, 
+        fmse_env_per_updraft = get_env_field(fmse_t, updraft_lats, updraft_lons, 
                                 all_lats, all_lons, updraft_bool, radius)
+
+        rho_env_per_updraft = get_env_field(rho_t, updraft_lats, updraft_lons, 
+                                all_lats, all_lons, updraft_bool, radius)
+        
+        updraft_buoyancy = 9.81 * ((rho_env_per_updraft - rho_updrafts) / rho_updrafts)
 
 
         
-        fmse_updraft_out[i, :, where_mcs_updraft]  = fmse_updrafts.T
-        fmse_env_out[i, :, where_mcs_updraft]      = fmse_env_per_updraft.T
-        rho_updraft_out[i, :, where_mcs_updraft]   = rho_updrafts.T
-        z_updraft_out[i, :, where_mcs_updraft]     = z_updrafts.T
-        w_updraft_out[i, :, where_mcs_updraft]     = w_updrafts.T
+        fmse_updraft_out[i, :, where_mcs_updraft]       = fmse_updrafts.T
+        fmse_env_out[i, :, where_mcs_updraft]           = fmse_env_per_updraft.T
+        rho_updraft_out[i, :, where_mcs_updraft]        = rho_updrafts.T
+        z_updraft_out[i, :, where_mcs_updraft]          = z_updrafts.T
+        w_updraft_out[i, :, where_mcs_updraft]          = w_updrafts.T
         updraft_mass_flux_out[fi, :, where_mcs_updraft] = updraft_mass_fluxes.T
-        track_id_out[i, where_mcs_updraft]         = mask_wam[where_mcs_updraft]
+        updraft_buoyancy_out[fi, :, where_mcs_updraft]  = updraft_buoyancy.T
+        track_id_out[i, where_mcs_updraft]              = mask_wam[where_mcs_updraft]
 
     ds_out = xr.Dataset({
         'fmse_env': xr.DataArray(fmse_env_out,          dims=['time', 'pressure', 'cell']),
@@ -397,6 +414,7 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
         'rho_updraft': xr.DataArray(rho_updraft_out,          dims=['time', 'pressure', 'cell']),
         'w_updraft': xr.DataArray(w_updraft_out,          dims=['time', 'pressure', 'cell']),
         'updraft_mass_flux': xr.DataArray(updraft_mass_flux_out,          dims=['time', 'pressure', 'cell']),
+        'updraft_buoyancy': xr.DataArray(updraft_buoyancy_out,          dims=['time', 'pressure', 'cell']),
         'track_id': xr.DataArray(track_id_out, dims=['time', 'cell'])
     })
     
