@@ -12,7 +12,8 @@ Generated files:
     slurm/output/<job_id>_<array_idx>.{out,err}     — SLURM logs
 
 Usage:
-    python submit.py --model um_glm_n2560_RAL3p3_tuned_hk26
+    python submit.py --model um_glm_n2560_RAL3p3_tuned_hk26 --region <region> --script <script> --radius <radius>
+    python submit.py --model um_glm_n2560_RAL3p3_tuned_hk26 --region <region> --script <script> --radius <radius> --no-mcs
     python submit.py --model um_glm_n2560_RAL3p3_tuned_hk26 --dry-run
 """
 import argparse
@@ -39,7 +40,9 @@ SBATCH_OPTS = {
 SCRIPT_CONFIGS = {
     'calc_fmse':     {'tag': 'fmse',     'zarr': 'fmse_{region}.zarr',     'script': 'calc_fmse.py'},
     'calc_mcs_fmse': {'tag': 'mcs_fmse', 'zarr': 'mcs_fmse_{region}.zarr', 'script': 'calc_mcs_fmse.py'},
-    'calc_mcs_env_updraft_fmse': {'tag': 'mcs_env_updraft_fmse_{radius}km', 'zarr': 'mcs_env_updraft_fmse_{radius}km.zarr', 'script': 'calc_mcs_env_updraft_fmse.py'}
+    'calc_mcs_env_updraft_fmse': {'tag': '{mcs_prefix}env_updraft_fmse_{radius}km', 
+                                  'zarr': '{mcs_prefix}env_updraft_fmse_{radius}km.zarr', 
+                                  'script': 'calc_mcs_env_updraft_fmse.py'}, 
 }
 
 def count_zarr_times(zarr_path):
@@ -54,10 +57,10 @@ def pending_chunks(model, region, tag, zarr_path):
             if not models.chunk_donefile(model, i, tag=tag).exists()]
 
 
-def write_task_json(model, region, chunks, name, radius=None):
+def write_task_json(model, region, chunks, name, radius=None, mcs=True):
     path = Path('slurm') / 'tasks' / f'{name}.json'
     path.parent.mkdir(parents=True, exist_ok=True)
-    cfg = {'model': model, 'region': region, 'tasks': [{'chunk': c} for c in chunks]}
+    cfg = {'model': model, 'region': region, 'mcs': mcs, 'tasks': [{'chunk': c} for c in chunks]}
     if radius is not None:
         cfg['radius'] = radius
     path.write_text(json.dumps(cfg, indent=2))
@@ -100,13 +103,18 @@ def main():
                         help='Which script to submit (default: calc_fmse)')
     parser.add_argument('--radius', type=int, default=None,
                     help='Environment radius in km (only for calc_env_updraft_fmse)')
+    parser.add_argument('--no-mcs', action='store_false', dest='mcs')
     args = parser.parse_args()
 
     model, region = args.model, args.region
     radius = args.radius if args.script == 'calc_mcs_env_updraft_fmse' else None
+    mcs = args.mcs 
+    mcs_prefix = 'mcs_' if mcs else ''
+
+
 
     cfg        = SCRIPT_CONFIGS[args.script]
-    fmt = {'region': region, 'radius': radius}
+    fmt = {'region': region, 'radius': radius, 'mcs_prefix': mcs_prefix}
     if radius is not None:
         fmt['radius'] = radius
     tag       = cfg['tag'].format(**fmt)
@@ -146,7 +154,7 @@ def main():
     ts   = datetime.now().strftime('%Y%m%d_%H%M%S')
     name = f'{ts}_{model}_{region}'
 
-    json_path   = write_task_json(model, region, chunks, name, radius=radius)
+    json_path   = write_task_json(model, region, chunks, name, radius=radius, mcs=mcs)
     script_path = write_slurm_script(name, json_path, n, script)
     print(f'Task JSON:    {json_path}')
     print(f'SLURM script: {script_path}')

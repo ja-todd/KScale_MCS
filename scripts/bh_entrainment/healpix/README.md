@@ -29,9 +29,17 @@ python submit.py --model <model_id> --region <region> --script calc_fmse
 ### 2. Compute per-MCS-track updraft and environmental FMSE: NOTE: The default radius = 50km from the updrafts; 10km seemed to be too strict and \n  was returning NaN arrays a lot of the time. 
 
 ```
-python submit.py --model <model_id> --region <region> --script calc_mcs_env_updraft_fmse --radius <radius(km)>
+python submit.py --model <model_id> --region <region> --script calc_mcs_env_updraft_fmse --radius <radius(km)> 
 
 ```
+#### OR: 
+
+```
+python submit.py --model <model_id> --region <region> --script calc_mcs_env_updraft_fmse --radius <radius(km)> --no-mcs
+```
+### Computes updraft and environmental FMSE for all updrafts, not just MCS updrafts. 
+
+
 
 #### Again, initializes a different zarr store and submits the chunks which have absent donefiles. 
 
