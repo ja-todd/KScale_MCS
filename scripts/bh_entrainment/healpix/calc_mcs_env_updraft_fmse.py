@@ -4,20 +4,22 @@ Compute per-track frozen MSE statistics for region-filtered MCS tracks
 Links fmse_<region>.zarr (3-hourly) with the PyFLEXTRKR MCS pixel mask (hourly) to produce
 a NetCDF with dims (tracks, times_3h) following PyFLEXTRKR output conventions.
 
+OR (if --no-mcs): 
+Computes frozen MSE statistics for region-filtered MCS updrafts & associated environments 
+
+
 
 Code logic: 
 
-Output updraft frozen moist static energy and per-updraft mean frozen moist static energy for the environment
+Output updraft frozen moist static energy and per-updraft (MCS or not) mean frozen moist static energy for the environment
 
 Usage: 
 
     python submit.py --model <model_id> --script calc_mcs_env_updraft_fmse 
+    python submit.py --model <model_id> --script calc_mcs_env_updraft_fmse --radius <radius> --region <region> --no-mcs
+    python submit.py --model <model_id> --script calc_mcs_env_updraft_fmse --radius <radius> --region <region>
 
-""" 
-""" 
-Utils for MCS track output from PyFLEXTRKR
-
-""" 
+"""
 
 import argparse
 import json
@@ -79,10 +81,10 @@ def init_zarr(model, region, radius, mcs=True):
             dims=['time', 'cell'],
             attrs={'description': 'MCS track number at each cell'}
         )
-        zarr_path = models.data_dir(model) / f'mcs_env_updraft_fmse_{radius}km.zarr'
+        zarr_path = models.data_dir(model) / f'mcs_env_updraft_fmse_{region}_{radius}km.zarr'
         done_tag  = f'mcs_env_updraft_fmse_{radius}km'
     else:
-        zarr_path = models.data_dir(model) / f'env_updraft_fmse_{radius}km.zarr'
+        zarr_path = models.data_dir(model) / f'env_updraft_fmse_{region}_{radius}km.zarr'
         done_tag  = f'env_updraft_fmse_{radius}km'
 
     template = xr.Dataset(common_vars, coords=common_coords)
@@ -267,11 +269,11 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
 
 def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
                    model, region, radius, n_timesteps=None, w_updraft_threshold=1, qc_updraft_threshold=1e-5): 
-    done_file = models.chunk_donefile(model, chunk_idx, tag=f'mcs_env_updraft_fmse_{radius}km')
+    done_file = models.chunk_donefile(model, chunk_idx, tag=f'mcs_env_updraft_fmse_{region}_{radius}km')
     if done_file.exists():
         print(f'Chunk {chunk_idx} already done, skipping.')
         return
-    zarr_path     = models.data_dir(model) / f'mcs_env_updraft_fmse_{radius}km.zarr' 
+    zarr_path     = models.data_dir(model) / f'mcs_env_updraft_fmse_{region}_{radius}km.zarr' 
     
     wam_positions = compute_wam_positions(fmse_ds, mask_ds)
     fmse_idxs, mask_idxs, _ = align_times(fmse_ds, mask_ds)

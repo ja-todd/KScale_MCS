@@ -287,7 +287,7 @@ def main():
         if args.mcs: 
             print("Opening and computing zarr ...")
             ds = xr.open_zarr(models.data_dir(args.model) /\
-                    f'mcs_env_updraft_fmse_{args.radius}km.zarr').compute()
+                    f'mcs_env_updraft_fmse_{args.region}_{args.radius}km.zarr').compute()
             print("Computing track entrainment")
             compute_track_entrainment(ds, dstracks_wam, args.model, 
                                     args.region, args.radius, args.surface)
@@ -295,7 +295,7 @@ def main():
             
             print("Opening and computing zarr ...")
             ds = xr.open_zarr(models.data_dir(args.model) /\
-                 f'env_updraft_fmse_{args.radius}km.zarr').compute()
+                 f'env_updraft_fmse_{args.region}_{args.radius}km.zarr').compute()
             print("Computing domain entrainment")
 
             compute_domain_entrainment(ds, args.model, args.region,
