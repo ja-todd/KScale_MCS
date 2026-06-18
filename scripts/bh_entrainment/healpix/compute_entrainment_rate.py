@@ -1,14 +1,31 @@
-""" Computes the per-track Becker and Hohenegger (2021) frozen MSE entrainment rate
+""" Computes the per-track OR domain-wide Becker and Hohenegger (2021) frozen MSE entrainment rate
+    
 
-Usage: python compute_entrainment_rate.py --init --model <model_id> --region <region> (wam default)
-python compute_entrainment_rate.py --run --model <model_id> --region <region> (wam default)
+For MCSs: 
+    Usage: python compute_entrainment_rate.py --init --model <model_id> --region <region> (wam default) --radius <radius> (km) --surface <surface> (default: 'all')
+    python compute_entrainment_rate.py --run --model <model_id> --region <region> (wam default) --radius <radius> (km) --surface <surface> (default: 'all')
 
-Output: 
-mcs_entr_rate_<region>.zarr 
+    Output: 
+        mcs_entr_rate_<region>_<radius>km.zarr
+        OR
+        mcs_entr_rate_<region>_<radius>km_[<surface>].zarr
+        dims: tracks: ; times_3h: ; pressure: 
 
-dims: tracks: ; times_3h: ; pressure: 
+For whole domain (not MCS-specific): 
+    python compute_entrainment_rate.py --init --model <model_id> --region <region> (wam default) --radius <radius> --surface <surface> --no-mcs 
+    python compute_entrainment_rate.py --init --model <model_id> --region <region> (wam default) --radius <radius> --surface <surface> --no-mcs 
 
-currently no functionality to filter by surface, but should not be difficult to introduce
+    Output: 
+        entr_rate_<region>_<radius>km.zarr
+        OR
+        entr_rate_<region>_<radius>km_[<surface>].zarr
+
+        dims: times: ; pressure: 
+
+
+
+
+
 
 """
 
@@ -30,16 +47,40 @@ import pandas as pd
 # Zarr store initialization 
 #-----------------------------------------------------------------------
 
+def init_zarr_no_mcs(model, region, radius=50, surface='all'): 
+    region_cfg = models.REGIONS[region]
+    ds = open_region_dataset(model, region_cfg)
+    n_pressures = ds.sizes['pressure']
+    n_times = ds.sizes['time']
+
+    template = xr.Dataset({
+        'entrainment_rate': xr.DataArray(
+        dsa.full((n_times, n_pressures), np.nan, dtype=np.float32,
+                 chunks=(n_times, n_pressures)),
+        dims=['time', 'pressure'],
+        attrs={'units': 'm-1'}),
+
+    }, 
+    coords={'time': ds.time, 'pressure': ds.pressure.sortby('pressure', ascending=False)})
+    if surface == 'all': 
+        zarr_path = models.data_dir(model) / f'entr_rate_{region}_{radius}km.zarr'
+    else: 
+        zarr_path = models.data_dir(model) / f'entr_rate_{region}_{surface}_{radius}km.zarr'
+
+    zarr_path.parent.mkdir(parents=True, exist_ok=True) 
+    template.to_zarr(zarr_path, mode='w', zarr_format=2)
+
+    done_dir = models.done_dir(model)
+    done_dir.mkdir(parents=True, exist_ok=True)
+    models.init_donefile(model, region, tag=f'entr_rate_{surface}_{radius}km').touch()
+    print(f'Created {zarr_path}  shape=({n_times}, {n_pressures})')
+
+
 def init_zarr(model, region, dstracks_wam, radius=50, surface='all'): 
     region_cfg = models.REGIONS[region]
     ds = open_region_dataset(model, region_cfg)
 
-
-    n_times  = ds.sizes['time']
     n_pressures = ds.sizes['pressure']
-    n_cells  = ds.sizes['cell']
-    # n_chunks = (n_times + CHUNK_SIZE - 1) // CHUNK_SIZE
-
     n_tracks = dstracks_wam.sizes['tracks']
 
     template = xr.Dataset({
@@ -75,7 +116,9 @@ def init_zarr(model, region, dstracks_wam, radius=50, surface='all'):
 
 def compute_entr_rate(ds):
     # mass flux weights
-    mass_flux = ds.rho_updraft * ds.w_updraft  # (time, pressure, cell)
+    # mass_flux = ds.rho_updraft * ds.w_updraft  # (time, pressure, cell)
+    mass_flux = ds.updraft_mass_flux # (time, pressure, cell)
+
 
     if mass_flux.sum().values == 0: 
         return None
@@ -94,10 +137,41 @@ def compute_entr_rate(ds):
     
     return epsilon.astype(np.float32)
 
+def compute_domain_entrainment(ds, model, region, radius=50, surface='all'):
+    """"""
+    if surface == 'all': 
+        zarr_path = models.data_dir(model) / f'entr_rate_{region}_{radius}km.zarr'
+    else: 
+        zarr_path = models.data_dir(model) / f'entr_rate_{region}_{surface}_{radius}km.zarr'
+
+    n_times = ds.sizes['time']
+    n_pressures = ds.sizes['pressure']
+
+    entr_rate_out = np.full((n_times, n_pressures), np.nan, dtype=np.float32)
+
+    for t in range(n_times): 
+        ds_t = ds.isel(time=t)
+
+        entr_rate = compute_entr_rate(ds_t)
+
+        if entr_rate is None:
+            continue
+
+        entr_rate_out[t, :] = entr_rate
+    
+    ds_out = xr.Dataset({
+        'entrainment_rate': xr.DataArray(entr_rate_out, dims=['time', 'pressure']),
+    })
+
+    ds_out.to_zarr(zarr_path, region={'time': t})
+
+    print('Done')
+
+
 
 def compute_track_entrainment(ds, dstracks_wam, model, region, radius=50, surface='all'): 
     if surface == 'all': 
-        zarr_path     = models.data_dir(model) / f'mcs_entr_rate_{region}_{radius}km.zarr'
+        zarr_path = models.data_dir(model) / f'mcs_entr_rate_{region}_{radius}km.zarr'
     else: 
         zarr_path = models.data_dir(model) / f'mcs_entr_rate_{region}_{surface}_{radius}km.zarr'
 
@@ -189,6 +263,8 @@ def main():
                         help='Filter MCS by mean land fraction: land (>0.8), ocean (<0.2), all (default)')
     parser.add_argument('--radius', type=int, default=50, metavar='N', 
                         help='radius in km to select from')
+    parser.add_argument('--no-mcs', action='store_false', dest='mcs',
+                    help='Process all updrafts in domain rather than MCS only')
     models.add_model_arg(parser)
     models.add_region_arg(parser)
     args = parser.parse_args()
@@ -202,16 +278,29 @@ def main():
     dstracks_wam = filter_surface(dstracks_wam, args.surface)
 
     if args.init:
-        init_zarr(args.model, args.region, dstracks_wam, args.radius, args.surface)
-
+        if args.mcs: 
+            init_zarr(args.model, args.region, dstracks_wam, args.radius, args.surface)
+        else: 
+            init_zarr_no_mcs(args.model, args.region, args.radius, args.surface)
 
     if args.run: 
-        print("Opening and computing zarr ....")
-        ds = xr.open_zarr(models.data_dir(args.model) /\
-                 f'mcs_env_updraft_fmse_{args.radius}km.zarr').compute()
-        print("Computing track entrainment")
-        compute_track_entrainment(ds, dstracks_wam, args.model, 
-                                  args.region, args.radius, args.surface)
+        if args.mcs: 
+            print("Opening and computing zarr ...")
+            ds = xr.open_zarr(models.data_dir(args.model) /\
+                    f'mcs_env_updraft_fmse_{args.radius}km.zarr').compute()
+            print("Computing track entrainment")
+            compute_track_entrainment(ds, dstracks_wam, args.model, 
+                                    args.region, args.radius, args.surface)
+        else:
+            
+            print("Opening and computing zarr ...")
+            ds = xr.open_zarr(models.data_dir(args.model) /\
+                 f'env_updraft_fmse_{args.radius}km.zarr').compute()
+            print("Computing domain entrainment")
+
+            compute_domain_entrainment(ds, args.model, args.region,
+                                        args.radius, args.surface )
+
 
 
 if __name__ == '__main__':
