@@ -23,7 +23,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-import src.models as models 
+import src.hp_models as models 
 
 CHUNK_SIZE = 10      # must match CHUNK_SIZE in calc_entrainment.py
 
