@@ -14,3 +14,4 @@ run_updraft_jobs.sh
 .vscode
 plot_mcs_mask.py 
 *.png
+plotting/

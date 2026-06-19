@@ -140,11 +140,11 @@ def get_env_field(field_t, updraft_lats, updraft_lons, all_lats, all_lons,
 
 def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
                           model, region, radius, n_timesteps=None, w_updraft_threshold=1, qc_updraft_threshold=1e-5):
-    done_file = models.chunk_donefile(model, chunk_idx, tag=f'env_updraft_fmse_{radius}km')
+    done_file = models.chunk_donefile(model, chunk_idx, tag=f'env_updraft_fmse_{region}_{radius}km')
     if done_file.exists():
         print(f'Chunk {chunk_idx} already done, skipping.')
         return
-    zarr_path     = models.data_dir(model) / f'env_updraft_fmse_{radius}km.zarr'
+    zarr_path     = models.data_dir(model) / f'env_updraft_fmse_{region}_{radius}km.zarr'
     
     fmse_idxs = np.arange(t_start, t_end)
 
