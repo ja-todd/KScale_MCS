@@ -158,18 +158,18 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
     fmse_chunk  = fmse_ds.isel(time=slice(t_start, t_end))['fmse'].compute().values
     n_cells = fmse_chunk.shape[2]
 
-    fmse_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    fmse_env_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    z_updraft_out   = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    rho_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    w_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    fmse_updraft_out      = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    fmse_env_out          = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    z_updraft_out         = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    rho_updraft_out       = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    w_updraft_out         = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
     updraft_mass_flux_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    updraft_buoyancy_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    updraft_buoyancy_out  = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
 
     in_chunk        = (fmse_idxs >= t_start) & (fmse_idxs < t_end)
     fmse_idxs_chunk = fmse_idxs[in_chunk]
 
-    w_chunk = full_ds.wa.isel(time=slice(t_start, t_end))
+    w_chunk  = full_ds.wa.isel(time=slice(t_start, t_end))
     ql_chunk = full_ds.clw.isel(time=slice(t_start, t_end))
     qi_chunk = full_ds.cli.isel(time=slice(t_start, t_end))
     qc_chunk = ql_chunk + qi_chunk 
@@ -180,14 +180,14 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
     all_lons = fmse_ds.lon.values
 
     for fi in fmse_idxs_chunk: 
-        w_t = w_chunk.isel(time=fi).compute().values
+        w_t  = w_chunk.isel(time=fi).compute().values
         qc_t = qc_chunk.isel(time=fi).compute().values
 
         w_mask       = w_t > w_updraft_threshold
         qc_mask      = qc_t > qc_updraft_threshold
         updraft_mask = w_mask & qc_mask
 
-        cell_updraft = updraft_mask.any(axis=0)
+        cell_updraft  = updraft_mask.any(axis=0)
         where_updraft = np.where(cell_updraft)[0]
 
         
@@ -289,25 +289,25 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
     n_cells = fmse_chunk.shape[2]
 
 
-    fmse_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    fmse_env_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    z_updraft_out   = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    rho_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    w_updraft_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    fmse_updraft_out      = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    fmse_env_out          = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    z_updraft_out         = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    rho_updraft_out       = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    w_updraft_out         = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
     updraft_mass_flux_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    updraft_buoyancy_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    track_id_out = np.full((n_chunk, n_cells), np.nan, dtype=np.float32)
+    updraft_buoyancy_out  = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    track_id_out          = np.full((n_chunk, n_cells), np.nan, dtype=np.float32)
 
     in_chunk        = (fmse_idxs >= t_start) & (fmse_idxs < t_end)
     fmse_idxs_chunk = fmse_idxs[in_chunk]
     mask_idxs_chunk = mask_idxs[in_chunk]
 
-    w_chunk = full_ds.wa.isel(time=slice(t_start, t_end))
+    w_chunk  = full_ds.wa.isel(time=slice(t_start, t_end))
     ql_chunk = full_ds.clw.isel(time=slice(t_start, t_end))
     qi_chunk = full_ds.cli.isel(time=slice(t_start, t_end))
     qc_chunk = ql_chunk + qi_chunk 
 
-    p_levs = fmse_ds.pressure.values
+    p_levs   = fmse_ds.pressure.values
     p500_idx = np.where(p_levs == 500)[0].item(0)
     all_lats = fmse_ds.lat.values 
     all_lons = fmse_ds.lon.values
@@ -339,21 +339,21 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
         updraft_mask = w_mask & qc_mask
 
 
-        cell_updraft = updraft_mask.any(axis=0)  ### boolean array (N, ) for every grid cell
-        where_updraft = np.where(cell_updraft)[0] ### integer index array, where cell_updraft is True
+        cell_updraft      = updraft_mask.any(axis=0)  ### boolean array (N, ) for every grid cell
+        where_updraft     = np.where(cell_updraft)[0] ### integer index array, where cell_updraft is True
 
-        where_mcs    = np.where(mcs_bool)[0]  ## mcs mask on original grid 
+        where_mcs         = np.where(mcs_bool)[0]  ## mcs mask on original grid 
         where_mcs_updraft = where_mcs[where_updraft]  ## cell positions of the updrafts on original region grid
 
         
-        w_500 = w_t[p500_idx, :]
-        qc_500 = qc_t[p500_idx, :]
-        updraft_500_mask = (w_500 > w_updraft_threshold) & (qc_500 > qc_updraft_threshold)
+        w_500             = w_t[p500_idx, :]
+        qc_500            = qc_t[p500_idx, :]
+        updraft_500_mask  = (w_500 > w_updraft_threshold) & (qc_500 > qc_updraft_threshold)
 
         deep_updraft_mask = np.zeros(len(where_mcs_updraft), dtype=bool)
 
-        updraft_lats = all_lats[where_mcs_updraft]
-        updraft_lons = all_lons[where_mcs_updraft]
+        updraft_lats      = all_lats[where_mcs_updraft]
+        updraft_lons      = all_lons[where_mcs_updraft]
         
 
 
@@ -362,7 +362,7 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
             all_lats[None, :], all_lons[None, :]
         )
 
-        nearby_matrix = dist_matrix <= 10 
+        nearby_matrix     = dist_matrix <= 10 
         deep_updraft_mask = (nearby_matrix & updraft_500_mask[None, :]).any(axis=1)
 
         where_mcs_updraft = where_mcs_updraft[deep_updraft_mask]
@@ -379,10 +379,10 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
         z_t    = fmse_ds.z.isel(time=fi).compute().values
         rho_t  = fmse_ds.rho.isel(time=fi).compute().values
 
-        fmse_updrafts = fmse_t[:, where_mcs_updraft]   
-        z_updrafts    = z_t[:, where_mcs_updraft] 
-        rho_updrafts  = rho_t[:, where_mcs_updraft]
-        w_updrafts    = w_t[:, where_mcs_updraft]
+        fmse_updrafts       = fmse_t[:, where_mcs_updraft]   
+        z_updrafts          = z_t[:, where_mcs_updraft] 
+        rho_updrafts        = rho_t[:, where_mcs_updraft]
+        w_updrafts          = w_t[:, where_mcs_updraft]
         updraft_mass_fluxes = rho_updrafts * w_updrafts
         
         

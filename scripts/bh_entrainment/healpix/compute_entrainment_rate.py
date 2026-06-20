@@ -126,11 +126,11 @@ def compute_entr_rate(ds):
     # weighted mean fmse profile over all updraft cells and time
     fmse_u = (ds.fmse_updraft * mass_flux).sum('cell') / mass_flux.sum('cell')  
     fmse_e = ds.fmse_env.mean('cell')   
-    z_mean = ds.z_updraft.mean('cell')  
+    z_u = (ds.z_updraft * mass_flux).sum('cell') / mass_flux.sum('cell')  
 
     # convert to numpy for differentiation
     fmse_u_np  = fmse_u.values 
-    z_np       = z_mean.values  
+    z_np       = z_u.values  
 
     dh_dz = np.gradient(fmse_u_np, z_np) 
     epsilon = -dh_dz / (fmse_u.values - fmse_e.values)  
