@@ -457,6 +457,19 @@ def main():
         fmse_ds = xr.open_zarr(models.data_dir(model) / f'fmse_{region}.zarr')
         full_ds = open_region_dataset(model, region_cfg).sortby('pressure', ascending=False)
 
+        
+
+        if mcs:
+            zarr_path = models.data_dir(model) / f'mcs_env_updraft_fmse_{region}_{radius}km.zarr'
+        else:
+            zarr_path = models.data_dir(model) / f'env_updraft_fmse_{region}_{radius}km.zarr'
+
+
+        if not zarr_path.exists():
+            init_zarr(model, region, radius, mcs=mcs)
+
+
+
         if mcs:
             compute_chunk(full_ds, fmse_ds, mask_ds, chunk, model, region, radius)
         else:
@@ -476,6 +489,7 @@ def main():
     args = parser.parse_args()
 
     if args.init:
+        print(f'mcs: {args.mcs}')
         init_zarr(args.model, args.region, args.radius, mcs=args.mcs)
 
 

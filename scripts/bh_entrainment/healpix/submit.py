@@ -40,8 +40,8 @@ SBATCH_OPTS = {
 SCRIPT_CONFIGS = {
     'calc_fmse':     {'tag': 'fmse',     'zarr': 'fmse_{region}.zarr',     'script': 'calc_fmse.py'},
     'calc_mcs_fmse': {'tag': 'mcs_fmse', 'zarr': 'mcs_fmse_{region}.zarr', 'script': 'calc_mcs_fmse.py'},
-    'calc_mcs_env_updraft_fmse': {'tag': '{mcs_prefix}env_updraft_fmse_{radius}km', 
-                                  'zarr': '{mcs_prefix}env_updraft_fmse_{radius}km.zarr', 
+    'calc_mcs_env_updraft_fmse': {'tag': '{mcs_prefix}env_updraft_fmse_{region}_{radius}km', 
+                                  'zarr': '{mcs_prefix}env_updraft_fmse_{region}_{radius}km.zarr', 
                                   'script': 'calc_mcs_env_updraft_fmse.py'}, 
 }
 
@@ -129,6 +129,8 @@ def main():
                '--model', model, '--region', region]
         if radius is not None:
             cmd += ['--radius', str(args.radius)]
+        if not mcs:
+            cmd += ['--no-mcs'] 
         if args.dry_run:
             print('  [dry-run]', ' '.join(cmd))
         else:
