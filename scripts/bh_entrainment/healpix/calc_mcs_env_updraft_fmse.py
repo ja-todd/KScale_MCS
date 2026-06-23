@@ -146,13 +146,19 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
         return
     zarr_path     = models.data_dir(model) / f'env_updraft_fmse_{region}_{radius}km.zarr'
     
-    fmse_idxs = np.arange(t_start, t_end)
+    
+
+    print(chunk_idx)
 
     t_start  = chunk_idx * CHUNK_SIZE
+    print(t_start)
+
     t_end    = min(t_start + CHUNK_SIZE, fmse_ds.sizes['time'])
     if n_timesteps is not None:
         t_end = min(t_start + n_timesteps, t_end)
     n_chunk  = t_end - t_start
+
+    fmse_idxs = np.arange(t_start, t_end)
 
     print(f'Chunk {chunk_idx}: time[{t_start}:{t_end}] ({n_chunk} timesteps)')
     fmse_chunk  = fmse_ds.isel(time=slice(t_start, t_end))['fmse'].compute().values
@@ -180,8 +186,9 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
     all_lons = fmse_ds.lon.values
 
     for fi in fmse_idxs_chunk: 
-        w_t  = w_chunk.isel(time=fi).compute().values
-        qc_t = qc_chunk.isel(time=fi).compute().values
+        i = fi - t_start
+        w_t  = w_chunk.isel(time=i).compute().values
+        qc_t = qc_chunk.isel(time=i).compute().values
 
         w_mask       = w_t > w_updraft_threshold
         qc_mask      = qc_t > qc_updraft_threshold
@@ -218,9 +225,9 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
         updraft_lats = all_lats[where_updraft]
         updraft_lons = all_lons[where_updraft]
 
-        fmse_t = fmse_ds.fmse.isel(time=fi).compute().values 
-        z_t    = fmse_ds.z.isel(time=fi).compute().values
-        rho_t  = fmse_ds.rho.isel(time=fi).compute().values
+        fmse_t = fmse_ds.fmse.isel(time=i).compute().values 
+        z_t    = fmse_ds.z.isel(time=i).compute().values
+        rho_t  = fmse_ds.rho.isel(time=i).compute().values
 
         fmse_updrafts = fmse_t[:, where_updraft]   
         z_updrafts    = z_t[:, where_updraft] 
@@ -239,13 +246,13 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
         
         updraft_buoyancy = micro.g * ((rho_env_per_updraft - rho_updrafts) / rho_updrafts)
         
-        fmse_updraft_out[fi, :, where_updraft]  = fmse_updrafts.T
-        fmse_env_out[fi, :, where_updraft]      = fmse_env_per_updraft.T
-        rho_updraft_out[fi, :, where_updraft]   = rho_updrafts.T
-        z_updraft_out[fi, :, where_updraft]     = z_updrafts.T
-        w_updraft_out[fi, :, where_updraft]     = w_updrafts.T
-        updraft_mass_flux_out[fi, :, where_updraft] = updraft_mass_fluxes.T
-        updraft_buoyancy_out[fi, :, where_updraft] = updraft_buoyancy.T
+        fmse_updraft_out[i, :, where_updraft]  = fmse_updrafts.T
+        fmse_env_out[i, :, where_updraft]      = fmse_env_per_updraft.T
+        rho_updraft_out[i, :, where_updraft]   = rho_updrafts.T
+        z_updraft_out[i, :, where_updraft]     = z_updrafts.T
+        w_updraft_out[i, :, where_updraft]     = w_updrafts.T
+        updraft_mass_flux_out[i, :, where_updraft] = updraft_mass_fluxes.T
+        updraft_buoyancy_out[i, :, where_updraft] = updraft_buoyancy.T
 
     ds_out = xr.Dataset({
         'fmse_env': xr.DataArray(fmse_env_out,          dims=['time', 'pressure', 'cell']),

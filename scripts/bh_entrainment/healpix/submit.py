@@ -40,7 +40,7 @@ SBATCH_OPTS = {
 SCRIPT_CONFIGS = {
     'calc_fmse':     {'tag': 'fmse',     'zarr': 'fmse_{region}.zarr',     'script': 'calc_fmse.py'},
     'calc_mcs_fmse': {'tag': 'mcs_fmse', 'zarr': 'mcs_fmse_{region}.zarr', 'script': 'calc_mcs_fmse.py'},
-    'calc_mcs_env_updraft_fmse': {'tag': '{mcs_prefix}env_updraft_fmse_{region}_{radius}km', 
+    'calc_mcs_env_updraft_fmse': {'tag': '{mcs_prefix}env_updraft_fmse_{radius}km', 
                                   'zarr': '{mcs_prefix}env_updraft_fmse_{region}_{radius}km.zarr', 
                                   'script': 'calc_mcs_env_updraft_fmse.py'}, 
 }
@@ -123,6 +123,8 @@ def main():
 
     # --- Ensure zarr is initialised ---
     init_done = models.init_donefile(model, region, tag=tag)
+    print(init_done)
+
     if not init_done.exists():
         print(f'init.done not found — running --init for {model} / {region}...')
         cmd = [sys.executable, script, '--init',
