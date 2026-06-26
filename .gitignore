@@ -13,4 +13,5 @@ plot_mcs_mask.py
 *.png
 plotting/
 notebooks/
-healpix/*.sh
+comp_entr_rate.sh 
+run_updraft_jobs.sh
