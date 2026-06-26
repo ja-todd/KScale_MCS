@@ -85,9 +85,7 @@ def compute_chunk(chunk_idx, model, region, n_timesteps=None):
     condensation_cloud = condensation_rate_t.where(qcloud > 0, 0)
     condensation_masked = condensation_cloud.where(condensation_cloud > 0, 0)
     condensation_rate = micro.pressure_integration(condensation_masked, -pressure, axis=1)
-    condensation_rate = np.where(condensation_rate > 0, condensation_rate, np.nan)
-
-
+    
     condensation_rate_out = condensation_rate.astype(np.float32)
 
     ds_out = xr.Dataset({
