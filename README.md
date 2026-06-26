@@ -5,7 +5,7 @@ Investigating shear-entrainment relationships in mesoscale convective systems ov
 
 ## Structure
 - `data/` — raw input data (not used currently)
-- `scripts/` — processing scripts - currently entrainment proxies (```proxy_entrainment/```) and entrainment rate calculated using Becker and Hohenegger's (2021) frozen MSE method (```bh_entrainment/```)
+- `scripts/` — processing scripts - currently entrainment proxies (```proxy_entrainment/```) and entrainment rate calculated using Becker and Hohenegger's (2021) frozen MSE method (```bh_entrainment/```), as well as precipitation efficiency (```precip_efficiency/```) using the state-variable (SV) method from Kukulies et al. (2024). 
 - `src/` — source code - files that are imported into many scripts - general utils/model configs and helpers. Much of this was written by Mark Muetzelfeldt during the 2026 KScale Hackathon
 - `results/` — output files (currently not used)
 - `docs/` — documentation (writing underway)
