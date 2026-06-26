@@ -12,7 +12,7 @@ Generated files:
     slurm/output/<job_id>_<array_idx>.{out,err}     — SLURM logs
 
 Usage:
-    python submit.py --model um_glm_n2560_RAL3p3_tuned_hk26 --region <region> --script <script> 
+    python submit.py --model <model> --region <[region]> --script <script> 
 """
 import argparse
 import json
@@ -36,7 +36,8 @@ SBATCH_OPTS = {
 }
 
 SCRIPT_CONFIGS = {
-    'compute_condensation_rates':     {'tag': 'condensation_rate',     'zarr': 'condensation_rate_{region}.zarr',     'script': 'compute_condensation_rates.py'}
+    'compute_condensation_rates':     {'tag': 'condensation_rate',     'zarr': 'condensation_rate_{region}.zarr',     'script': 'compute_condensation_rates.py'},
+    'mcs_condensation_rates':         {'tag': 'mcs_condensation_rate', 'zarr': 'mcs_condensation_rate_{region}.zarr', 'script': 'mcs_condensation_rates.py'}
 }
 
 def count_zarr_times(zarr_path):
@@ -71,7 +72,7 @@ def write_slurm_script(name, json_path, n_tasks, script_name):
     for k, v in SBATCH_OPTS.items():
         lines.append(f'#SBATCH --{k}={v}')
     lines += [
-        f'#SBATCH --job-name=entr_{name[:20]}',
+        f'#SBATCH --job-name=cond_rate_{name[:20]}',
         f'#SBATCH --array=0-{n_tasks - 1}',
         f'#SBATCH --output={output_dir}/%A_%a.out',
         f'#SBATCH --error={output_dir}/%A_%a.err',
@@ -100,7 +101,7 @@ def main():
     model, region = args.model, args.region
 
     cfg        = SCRIPT_CONFIGS[args.script]
-    fmt = {'region': region,}
+    fmt = {'region': region}
     tag       = cfg['tag'].format(**fmt)
     var = 'precip_efficiency'
     zarr_path = models.data_dir(model, var) / cfg['zarr'].format(**fmt)
