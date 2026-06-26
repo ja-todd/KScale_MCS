@@ -8,10 +8,9 @@ __pycache__/
 donefiles/
 slurm/
 figs/
-comp_entr_rate.sh
-run_updraft_jobs.sh
 .vscode
 plot_mcs_mask.py 
 *.png
 plotting/
 notebooks/
+healpix/*.sh

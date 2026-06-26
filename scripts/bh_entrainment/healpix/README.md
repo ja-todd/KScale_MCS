@@ -2,7 +2,6 @@
 
 ```
 bh_entrainment/
-├─ microphysics.py  -- set of physical constants and standard atmospheric conversions from Julia Kukulies precip. efficiency project
 ├─ calc_fmse.py  -- calculate 4D field of frozen moist static energy (FMSE) for the WAM region
 ├─ calc_mcs_fmse.py -- filter FMSE to WAM MCS tracks, with track_id as dimension
 ├─ calc_mcs_env_updraft_fmse.py -- compute per-track frozen MSE statistics for region-filtered MCS tracks, or statistics for all (including MCS) updrafts and associated environments 
