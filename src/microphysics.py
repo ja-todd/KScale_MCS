@@ -100,7 +100,7 @@ def pressure_integration(mixing_ratio, pressure , axis = 0):
     Returns:
       integrated_mass(np.array): 2D or 3D (if time dimension) of integrated mixing ratio in kg/m2   
     """
-    return np.trapz(mixing_ratio, pressure, axis = axis) * 1/g
+    return np.trapezoid(mixing_ratio, pressure, axis = axis) * 1/g
 
 
 def height_integration(density, heights, axis = 0):
@@ -114,7 +114,7 @@ def height_integration(density, heights, axis = 0):
     Returns:                                                                                                                                                                                   
       integrated_mass(np.array): 2D or 3D (if time dimension) of integrated mixing ratio in kg/m2                                                                                              
     """
-    return np.trapz(density, heights, axis = axis) 
+    return np.trapezoid(density, heights, axis = axis) 
 
 
 def get_saturation_vapor_pressure(temperature): 

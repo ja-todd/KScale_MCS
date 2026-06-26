@@ -91,10 +91,10 @@ def stats_url(model):
 # Filesystem path helpers  (all relative to the entrainment/ working dir)
 # ---------------------------------------------------------------------------
 
-def data_dir(model):
+def data_dir(model, var='entrainment'):
     if 'mask_path' in MODELS[model]: ## probably not a permanent fix 
-        return Path('/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data/z10') / model
-    return Path('/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data/z9') / model
+        return Path(f'/gws/ssde/j25b/mcs_prime/jtodd/{var}/data/z10') / model
+    return Path(f'/gws/ssde/j25b/mcs_prime/jtodd/{var}/data/z9') / model
 
 
 def figs_dir(model):
