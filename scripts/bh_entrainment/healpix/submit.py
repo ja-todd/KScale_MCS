@@ -31,7 +31,7 @@ SBATCH_OPTS = {
     'account':       'mcs_prime',
     'ntasks':        '1',
     'cpus-per-task': '1',
-    'mem':           '32G',
+    'mem':           '64G',
     'time':          '02:0:00',
     'partition':     'standard',
     'qos':           'high',

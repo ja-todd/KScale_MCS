@@ -101,7 +101,7 @@ def init_zarr(model, region, radius, mcs=True):
 
 
 def get_env_field(field_t, updraft_lats, updraft_lons, all_lats, all_lons, 
-                 updraft_bool, radius, batch_size=100):
+                 updraft_bool, radius, batch_size=50):
     """
     For each updraft cell, compute mean environment FMSE within radius.
     Returns fmse_env_per_updraft of shape (pressure, n_updrafts)
@@ -161,16 +161,19 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
     fmse_idxs = np.arange(t_start, t_end)
 
     print(f'Chunk {chunk_idx}: time[{t_start}:{t_end}] ({n_chunk} timesteps)')
-    fmse_chunk  = fmse_ds.isel(time=slice(t_start, t_end))['fmse'].compute().values
-    n_cells = fmse_chunk.shape[2]
+    n_cells = fmse_ds.sizes['cell']
+    n_pressures = fmse_ds.sizes['pressure']
 
-    fmse_updraft_out      = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    fmse_env_out          = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    z_updraft_out         = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    rho_updraft_out       = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    w_updraft_out         = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    updraft_mass_flux_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    updraft_buoyancy_out  = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+
+    out_shape = (n_chunk, n_pressures, n_cells)
+
+    fmse_updraft_out      = np.full_like(out_shape, np.nan, dtype=np.float32)
+    fmse_env_out          = np.full_like(out_shape, np.nan, dtype=np.float32)
+    z_updraft_out         = np.full_like(out_shape, np.nan, dtype=np.float32)
+    rho_updraft_out       = np.full_like(out_shape, np.nan, dtype=np.float32)
+    w_updraft_out         = np.full_like(out_shape, np.nan, dtype=np.float32)
+    updraft_mass_flux_out = np.full_like(out_shape, np.nan, dtype=np.float32)
+    updraft_buoyancy_out  = np.full_like(out_shape, np.nan, dtype=np.float32)
 
     in_chunk        = (fmse_idxs >= t_start) & (fmse_idxs < t_end)
     fmse_idxs_chunk = fmse_idxs[in_chunk]
@@ -222,6 +225,8 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
         if len(where_updraft) == 0:
             continue
         
+        where_updraft = np.atleast_1d(where_updraft)
+
         updraft_lats = all_lats[where_updraft]
         updraft_lons = all_lons[where_updraft]
 
