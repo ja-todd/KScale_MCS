@@ -8,7 +8,7 @@ import sys
 from pathlib import Path 
 import easygems.healpix as egh 
 import src.hp_models as models 
-from src.hp_utils import open_region_dataset, compute_wam_positions, align_times
+from src.hp_utils import open_region_dataset, compute_wam_positions, align_times, open_region_1h_dataset
 
 ### filter annoying warnings 
 warnings.filterwarnings('ignore', message='.*The return type of `Dataset.dims`.*', category=FutureWarning)
@@ -40,13 +40,9 @@ def init_zarr(model, region):
 
     template = xr.Dataset(
         { 
-            'condensation_rate': xr.DataArray(template_data, dims=['time', 'cell'], attrs = {'units': 'kg m2 s-1'}), 
-            'track_id': xr.DataArray(dsa.full((n_times, n_cells), np.nan, dtype=np.float32, 
-                 chunks=(CHUNK_SIZE, n_cells)),
-        dims=['time', 'cell'],
-        attrs={'description': 'MCS track number at each cell'})
-
-
+            'condensation_rate': xr.DataArray(template_data, dims=['time', 'cell'], attrs = {'units': 'kg m2 s-1'}),
+            'precip_flux': xr.DataArray(template_data, dims=['time', 'cell'], attrs = {'units': 'kg m2 s-1'}),
+            'track_id': xr.DataArray(template_data, dims=['time', 'cell'], attrs={'description': 'MCS track number at each cell'})
         }, 
         coords={'time': ds.time, 'cell': ds.cell, 'lat': ds.lat, 'lon': ds.lon},
         
@@ -63,7 +59,7 @@ def init_zarr(model, region):
     print(f'Submit array 0-{n_chunks - 1}  ({n_chunks} jobs)  via: python submit.py --model {model}')
 
 
-def compute_chunk(cr_ds, mask_ds, chunk_idx, model, region, n_timesteps=None): 
+def compute_chunk(cr_ds, precip_ds, mask_ds, chunk_idx, model, region, n_timesteps=None): 
     done_file = models.chunk_donefile(model, chunk_idx, tag='mcs_condensation_rate')
     if done_file.exists():
         print(f'Chunk {chunk_idx} already done, skipping.')
@@ -73,6 +69,13 @@ def compute_chunk(cr_ds, mask_ds, chunk_idx, model, region, n_timesteps=None):
     
     wam_positions         = compute_wam_positions(cr_ds, mask_ds)
     cr_idxs, mask_idxs, _ = align_times(cr_ds, mask_ds)
+    _, pr_idxs, _         = align_times(cr_ds, precip_ds)
+
+    in_chunk        = (cr_idxs >= t_start) & (cr_idxs < t_end)
+    cr_idxs_chunk   = cr_idxs[in_chunk]
+    mask_idxs_chunk = mask_idxs[in_chunk]
+    pr_idxs_chunk   = pr_idxs[in_chunk]
+
 
     t_start   = chunk_idx * CHUNK_SIZE
     t_end     = min(t_start + CHUNK_SIZE, cr_ds.sizes['time'])
@@ -82,18 +85,20 @@ def compute_chunk(cr_ds, mask_ds, chunk_idx, model, region, n_timesteps=None):
 
     print(f'Chunk {chunk_idx}: time[{t_start}:{t_end}] ({n_chunk} timesteps)')
     cr_chunk        = cr_ds.isel(time=slice(t_start, t_end))['condensation_rate'].compute().values
-    n_cells         = cr_chunk.shape[1]
-
+    pr_chunk        = precip_ds.isel(time=pr_idxs_chunk)['pr'].compute().values
+    n_cells         = cr_ds.sizes['cell']
 
     mcs_cr_out      = np.full_like(cr_chunk, np.nan, dtype=np.float32)
+    mcs_pr_out      = np.full_like(pr_chunk, np.nan, dtype=np.float32)
     track_id_out    = np.full((n_chunk, n_cells), np.nan, dtype=np.float32)
 
-    in_chunk        = (cr_idxs >= t_start) & (cr_idxs < t_end)
-    cr_idxs_chunk   = cr_idxs[in_chunk]
-    mask_idxs_chunk = mask_idxs[in_chunk]
+    
 
-    for ci, mi in zip(cr_idxs_chunk, mask_idxs_chunk):
-        i = ci - t_start
+    
+
+    for idx, (ci, mi) in enumerate(zip(cr_idxs_chunk, mask_idxs_chunk)):
+        i    = ci - t_start
+        i_pr = idx
 
         mask_global = mask_ds.mcs_mask.isel(time=mi).compute().values
         mask_global = np.nan_to_num(mask_global, nan=0.0)
@@ -104,10 +109,12 @@ def compute_chunk(cr_ds, mask_ds, chunk_idx, model, region, n_timesteps=None):
             continue  # no MCS at this timestep, leave as NaN
 
         mcs_cr_out[i, mcs_bool]    = cr_chunk[i, mcs_bool]
+        mcs_pr_out[i, mcs_bool]    = pr_chunk[i_pr, mcs_bool]
         track_id_out[i, mcs_bool]  = mask_wam[mcs_bool]
 
     ds_out = xr.Dataset({
         'condensation_rate': xr.DataArray(mcs_cr_out,          dims=['time', 'cell']), 
+        'precip_flux'      : xr.DataArray(mcs_pr_out,          dims=['time', 'cell']),
         'track_id':          xr.DataArray(track_id_out,        dims=['time', 'cell'])
     })
 
@@ -138,6 +145,7 @@ def main():
         model      = task_cfg['model']
         region     = task_cfg['region']
         chunk      = task_cfg['tasks'][task_index]['chunk']
+        region_cfg = models.REGIONS[region]
         
         global MASK_URL, ZOOM
         ZOOM = models.MODELS[model]['zoom']
@@ -146,9 +154,10 @@ def main():
 
         var = 'precip_efficiency'
 
-        cr_ds = xr.open_zarr(models.data_dir(model, var) / f'condensation_rate_{region}.zarr')
+        cr_ds     = xr.open_zarr(models.data_dir(model, var) / f'condensation_rate_{region}.zarr')
+        precip_ds = open_region_1h_dataset(model, region_cfg)
 
-        compute_chunk(cr_ds, mask_ds, chunk, model, region)
+        compute_chunk(cr_ds, precip_ds, mask_ds, chunk, model, region)
         return
 
     parser = argparse.ArgumentParser(description=__doc__,
