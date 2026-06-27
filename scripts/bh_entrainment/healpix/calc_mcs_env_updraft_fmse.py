@@ -167,13 +167,13 @@ def compute_chunk_no_mcs(full_ds, fmse_ds, chunk_idx,
 
     out_shape = (n_chunk, n_pressures, n_cells)
 
-    fmse_updraft_out      = np.full_like(out_shape, np.nan, dtype=np.float32)
-    fmse_env_out          = np.full_like(out_shape, np.nan, dtype=np.float32)
-    z_updraft_out         = np.full_like(out_shape, np.nan, dtype=np.float32)
-    rho_updraft_out       = np.full_like(out_shape, np.nan, dtype=np.float32)
-    w_updraft_out         = np.full_like(out_shape, np.nan, dtype=np.float32)
-    updraft_mass_flux_out = np.full_like(out_shape, np.nan, dtype=np.float32)
-    updraft_buoyancy_out  = np.full_like(out_shape, np.nan, dtype=np.float32)
+    fmse_updraft_out      = np.full(out_shape, np.nan, dtype=np.float32)
+    fmse_env_out          = np.full(out_shape, np.nan, dtype=np.float32)
+    z_updraft_out         = np.full(out_shape, np.nan, dtype=np.float32)
+    rho_updraft_out       = np.full(out_shape, np.nan, dtype=np.float32)
+    w_updraft_out         = np.full(out_shape, np.nan, dtype=np.float32)
+    updraft_mass_flux_out = np.full(out_shape, np.nan, dtype=np.float32)
+    updraft_buoyancy_out  = np.full(out_shape, np.nan, dtype=np.float32)
 
     in_chunk        = (fmse_idxs >= t_start) & (fmse_idxs < t_end)
     fmse_idxs_chunk = fmse_idxs[in_chunk]
@@ -285,9 +285,9 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
     if done_file.exists():
         print(f'Chunk {chunk_idx} already done, skipping.')
         return
-    zarr_path     = models.data_dir(model) / f'mcs_env_updraft_fmse_{region}_{radius}km.zarr' 
+    zarr_path               = models.data_dir(model) / f'mcs_env_updraft_fmse_{region}_{radius}km.zarr' 
     
-    wam_positions = compute_wam_positions(fmse_ds, mask_ds)
+    wam_positions           = compute_wam_positions(fmse_ds, mask_ds)
     fmse_idxs, mask_idxs, _ = align_times(fmse_ds, mask_ds)
 
     t_start  = chunk_idx * CHUNK_SIZE
@@ -297,17 +297,20 @@ def compute_chunk(full_ds, fmse_ds, mask_ds, chunk_idx,
     n_chunk  = t_end - t_start
 
     print(f'Chunk {chunk_idx}: time[{t_start}:{t_end}] ({n_chunk} timesteps)')
-    fmse_chunk  = fmse_ds.isel(time=slice(t_start, t_end))['fmse'].compute().values
-    n_cells = fmse_chunk.shape[2]
+
+    n_cells     = fmse_ds.sizes['cell']
+    n_pressures = fmse_ds.sizes['pressure']
+
+    out_shape = (n_chunk, n_pressures, n_cells)
 
 
-    fmse_updraft_out      = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    fmse_env_out          = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    z_updraft_out         = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    rho_updraft_out       = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    w_updraft_out         = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    updraft_mass_flux_out = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
-    updraft_buoyancy_out  = np.full_like(fmse_chunk, np.nan, dtype=np.float32)
+    fmse_updraft_out      = np.full(out_shape, np.nan, dtype=np.float32)
+    fmse_env_out          = np.full(out_shape, np.nan, dtype=np.float32)
+    z_updraft_out         = np.full(out_shape, np.nan, dtype=np.float32)
+    rho_updraft_out       = np.full(out_shape, np.nan, dtype=np.float32)
+    w_updraft_out         = np.full(out_shape, np.nan, dtype=np.float32)
+    updraft_mass_flux_out = np.full(out_shape, np.nan, dtype=np.float32)
+    updraft_buoyancy_out  = np.full(out_shape, np.nan, dtype=np.float32)
     track_id_out          = np.full((n_chunk, n_cells), np.nan, dtype=np.float32)
 
     in_chunk        = (fmse_idxs >= t_start) & (fmse_idxs < t_end)
