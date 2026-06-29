@@ -21,7 +21,7 @@ CHUNK_SIZE = 10
 ZOOM             = None
 MASK_URL         = None
 
-
+VAR = 'precip_efficiency'
 
 # ---------------------------------------------------------------------------
 # Initialize zarr store 
@@ -47,8 +47,7 @@ def init_zarr(model, region):
         coords={'time': ds.time, 'cell': ds.cell, 'lat': ds.lat, 'lon': ds.lon},
         
     )
-    var = 'precip_efficiency'
-    zarr_path = models.data_dir(model, var) / f'mcs_condensation_rate_{region}.zarr'
+    zarr_path = models.data_dir(model, VAR) / f'mcs_condensation_rate_{region}.zarr'
     zarr_path.parent.mkdir(parents=True, exist_ok=True) 
     template.to_zarr(zarr_path, mode='w', zarr_format=2)
 
@@ -64,8 +63,7 @@ def compute_chunk(cr_ds, precip_ds, mask_ds, chunk_idx, model, region, n_timeste
     if done_file.exists():
         print(f'Chunk {chunk_idx} already done, skipping.')
         return
-    var = 'precip_efficiency'
-    zarr_path             = models.data_dir(model, var) / f'mcs_condensation_rate_{region}.zarr' 
+    zarr_path             = models.data_dir(model, VAR) / f'mcs_condensation_rate_{region}.zarr' 
     
     wam_positions         = compute_wam_positions(cr_ds, mask_ds)
     cr_idxs, mask_idxs, _ = align_times(cr_ds, mask_ds)
@@ -158,9 +156,8 @@ def main():
         MASK_URL = models.mask_url(model)
         mask_ds = xr.open_zarr(MASK_URL, chunks={})
 
-        var = 'precip_efficiency'
 
-        cr_ds     = xr.open_zarr(models.data_dir(model, var) / f'condensation_rate_{region}.zarr')
+        cr_ds     = xr.open_zarr(models.data_dir(model, VAR) / f'condensation_rate_{region}.zarr')
         precip_ds = open_region_1h_dataset(model, region_cfg)
 
         compute_chunk(cr_ds, precip_ds, mask_ds, chunk, model, region)
