@@ -24,6 +24,8 @@ from pathlib import Path
 import src.hp_models as models
 
 CHUNK_SIZE = 10      # must match CHUNK_SIZE in calc_fmse.py
+VAR = 'precip_efficiency'
+
 
 SBATCH_OPTS = {
     'account':       'mcs_prime',
@@ -37,7 +39,8 @@ SBATCH_OPTS = {
 
 SCRIPT_CONFIGS = {
     'compute_condensation_rates':     {'tag': 'condensation_rate',     'zarr': 'condensation_rate_{region}.zarr',     'script': 'compute_condensation_rates.py'},
-    'mcs_condensation_rates':         {'tag': 'mcs_condensation_rate', 'zarr': 'mcs_condensation_rate_{region}.zarr', 'script': 'mcs_condensation_rates.py'}
+    'mcs_condensation_rates':         {'tag': 'mcs_condensation_rate', 'zarr': 'mcs_condensation_rate_{region}.zarr', 'script': 'mcs_condensation_rates.py'}, 
+    'compute_storm_PE':               {'tag': 'mcs_precip_efficiency', 'zarr': 'mcs_precip_efficiency_{region}_{surface}.zarr', 'script': 'compute_storm_PEs.py'}  
 }
 
 def count_zarr_times(zarr_path):
@@ -99,12 +102,10 @@ def main():
     args = parser.parse_args()
 
     model, region = args.model, args.region
-
     cfg        = SCRIPT_CONFIGS[args.script]
     fmt = {'region': region}
     tag       = cfg['tag'].format(**fmt)
-    var = 'precip_efficiency'
-    zarr_path = models.data_dir(model, var) / cfg['zarr'].format(**fmt)
+    zarr_path = models.data_dir(model, VAR) / cfg['zarr'].format(**fmt)
     script     = cfg['script']
 
     # --- Ensure zarr is initialised ---

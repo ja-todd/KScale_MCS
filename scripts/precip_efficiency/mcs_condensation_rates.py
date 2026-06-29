@@ -69,12 +69,11 @@ def compute_chunk(cr_ds, precip_ds, mask_ds, chunk_idx, model, region, n_timeste
     
     wam_positions         = compute_wam_positions(cr_ds, mask_ds)
     cr_idxs, mask_idxs, _ = align_times(cr_ds, mask_ds)
-    _, pr_idxs, _         = align_times(cr_ds, precip_ds)
+    cr_pr_idxs, pr_idxs, _ = align_times(cr_ds, precip_ds)
 
-    in_chunk        = (cr_idxs >= t_start) & (cr_idxs < t_end)
-    cr_idxs_chunk   = cr_idxs[in_chunk]
-    mask_idxs_chunk = mask_idxs[in_chunk]
-    pr_idxs_chunk   = pr_idxs[in_chunk]
+    
+
+    
 
 
     t_start   = chunk_idx * CHUNK_SIZE
@@ -82,6 +81,13 @@ def compute_chunk(cr_ds, precip_ds, mask_ds, chunk_idx, model, region, n_timeste
     if n_timesteps is not None:
         t_end = min(t_start + n_timesteps, t_end)
     n_chunk   = t_end - t_start
+
+    in_chunk        = (cr_idxs >= t_start) & (cr_idxs < t_end)
+    cr_idxs_chunk   = cr_idxs[in_chunk]
+    mask_idxs_chunk = mask_idxs[in_chunk]
+
+    cr_to_pr = dict(zip(cr_pr_idxs, pr_idxs))
+    pr_idxs_chunk = np.array([cr_to_pr[ci] for ci in cr_idxs_chunk])
 
     print(f'Chunk {chunk_idx}: time[{t_start}:{t_end}] ({n_chunk} timesteps)')
     cr_chunk        = cr_ds.isel(time=slice(t_start, t_end))['condensation_rate'].compute().values
