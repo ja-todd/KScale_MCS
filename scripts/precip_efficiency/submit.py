@@ -39,8 +39,7 @@ SBATCH_OPTS = {
 
 SCRIPT_CONFIGS = {
     'compute_condensation_rates':     {'tag': 'condensation_rate',     'zarr': 'condensation_rate_{region}.zarr',     'script': 'compute_condensation_rates.py'},
-    'mcs_condensation_rates':         {'tag': 'mcs_condensation_rate', 'zarr': 'mcs_condensation_rate_{region}.zarr', 'script': 'mcs_condensation_rates.py'}, 
-    'compute_storm_PE':               {'tag': 'mcs_precip_efficiency', 'zarr': 'mcs_precip_efficiency_{region}_{surface}.zarr', 'script': 'compute_storm_PEs.py'}  
+    'mcs_condensation_rates':         {'tag': 'mcs_condensation_rate', 'zarr': 'mcs_condensation_rate_{region}.zarr', 'script': 'mcs_condensation_rates.py'}  
 }
 
 def count_zarr_times(zarr_path):
