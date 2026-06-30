@@ -25,6 +25,16 @@ def init_zarr(model, region, all_track_ids):
                      chunks=(n_tracks, MAX_TIMES_3H)),
             dims=['tracks', 'times_3h'],
             attrs={'units': 'dimensionless'}),
+        'condensation_rate': xr.DataArray(
+            dsa.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32,
+                     chunks=(n_tracks, MAX_TIMES_3H)),
+            dims=['tracks', 'times_3h'],
+            attrs={'units': 'dimensionless'}),
+        'precip_flux': xr.DataArray(
+            dsa.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32,
+                     chunks=(n_tracks, MAX_TIMES_3H)),
+            dims=['tracks', 'times_3h'],
+            attrs={'units': 'dimensionless'}),
         'base_time': xr.DataArray(
             dsa.full((n_tracks, MAX_TIMES_3H), np.datetime64('NaT', 'ns'), dtype='datetime64[ns]',
                      chunks=(n_tracks, MAX_TIMES_3H)),
@@ -95,6 +105,8 @@ def compute_track_PE(ds, model, region):
             break
 
     PE_out        = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
+    cr_out        = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
+    pr_out        = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
     base_time_out = np.full((n_tracks, MAX_TIMES_3H),
                             np.datetime64('NaT', 'ns'), dtype='datetime64[ns]')
 
@@ -139,10 +151,14 @@ def compute_track_PE(ds, model, region):
                 continue
 
             PE_out[out_i, li]     = PE
+            cr_out[out_i, li]     = cr_track
+            pr_out[out_i, li]     = pr_track
             base_time_out[out_i, li] = t
 
     ds_out = xr.Dataset({
         'precip_eff': xr.DataArray(PE_out,        dims=['tracks', 'times_3h']),
+        'condensation_rate': xr.DataArray(cr_out,        dims=['tracks', 'times_3h']),
+        'precip_flux': xr.DataArray(pr_out,        dims=['tracks', 'times_3h']),
         'base_time':  xr.DataArray(base_time_out, dims=['tracks', 'times_3h'])
     })
 
