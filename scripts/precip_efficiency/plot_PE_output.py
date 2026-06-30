@@ -99,6 +99,7 @@ def plot_mcs_stats_PE():
     ax2.set_ylabel('Percentage of MCSs')
 
     plt.subplots_adjust(wspace=0.3)
+    plt.savefig('figs/mcs_counts_durations.pdf', bbox_inches = 'tight', dpi=300)
 
     fig, ax = plt.subplots()
 
