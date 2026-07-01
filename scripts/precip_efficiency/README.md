@@ -63,4 +63,4 @@ bash mcs_PE.sh
 plot_PE_output.py
 ```
 
-### This produces 5 plots in figs/. They are: mcs_counts_durations.pdf; mcs_PE_since_initiation.pdf; PE_normalized_lifecycle.pdf; cr_contribution_lifecycle.pdf and cr_pr_MCS_lifecycle.pdf. 
+### This produces plots in figs/. They are: mcs_counts_durations.pdf; mcs_PE_since_initiation.pdf; PE_normalized_lifecycle_<surface>.pdf; cr_contribution_lifecycle.pdf and cr_pr_MCS_lifecycle_<surface>.pdf. 

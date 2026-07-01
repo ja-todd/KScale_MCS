@@ -63,16 +63,11 @@ def compute_chunk(cr_ds, precip_ds, mask_ds, chunk_idx, model, region, n_timeste
     if done_file.exists():
         print(f'Chunk {chunk_idx} already done, skipping.')
         return
-    zarr_path             = models.data_dir(model, VAR) / f'mcs_condensation_rate_{region}.zarr' 
+    zarr_path              = models.data_dir(model, VAR) / f'mcs_condensation_rate_{region}.zarr' 
     
-    wam_positions         = compute_wam_positions(cr_ds, mask_ds)
-    cr_idxs, mask_idxs, _ = align_times(cr_ds, mask_ds)
+    wam_positions          = compute_wam_positions(cr_ds, mask_ds)
+    cr_idxs, mask_idxs, _  = align_times(cr_ds, mask_ds)
     cr_pr_idxs, pr_idxs, _ = align_times(cr_ds, precip_ds)
-
-    
-
-    
-
 
     t_start   = chunk_idx * CHUNK_SIZE
     t_end     = min(t_start + CHUNK_SIZE, cr_ds.sizes['time'])
@@ -95,10 +90,6 @@ def compute_chunk(cr_ds, precip_ds, mask_ds, chunk_idx, model, region, n_timeste
     mcs_cr_out      = np.full_like(cr_chunk, np.nan, dtype=np.float32)
     mcs_pr_out      = np.full_like(pr_chunk, np.nan, dtype=np.float32)
     track_id_out    = np.full((n_chunk, n_cells), np.nan, dtype=np.float32)
-
-    
-
-    
 
     for idx, (ci, mi) in enumerate(zip(cr_idxs_chunk, mask_idxs_chunk)):
         i    = ci - t_start

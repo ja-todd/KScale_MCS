@@ -137,9 +137,67 @@ for mname in MNAMES:
     TRACKS_DICT[mname] = dstracks
 
 
+def surface_filtering(var_values, dstracks, track_ids, surface='all'): 
+    full_track_indices = track_ids - 1       # convert to dstracks indices
+    valid_track_mask = full_track_indices < dstracks.sizes['tracks']
+    full_track_indices = full_track_indices[valid_track_mask]
+
+    dstracks.track_duration.load()
+    dstracks.meanlon.load()
+    dstracks.meanlat.load()
+
+    durations_hours = dstracks.track_duration.isel(tracks=full_track_indices).values
+
+    dstracks_surface = utils.filter_surface(dstracks, surface)
+    surface_track_indices = dstracks_surface.tracks.values
+
+    surface_mask = np.isin(full_track_indices, surface_track_indices )
+
+    var_out = var_values[valid_track_mask][surface_mask] 
+    durations_out = durations_hours[surface_mask]
+
+    return var_out, durations_out
 
 
-def plot_PE_normalized_lifecycle(): 
+def binned_norm_lifecycle(n_tracks, var_values, durations_hours, n_bins=20): 
+    # build normalised lifecycle arrays
+        
+    binned_var = np.full((n_tracks, n_bins), np.nan)
+
+    for tr in range(n_tracks):
+        n_valid = (~np.isnan(var_values[tr])).sum()  
+        
+        ## number of valid timesteps in times_3h
+        if n_valid < 2:  ## doesn't compute if only 1 timestep
+            continue
+        
+        valid_var = var_values[tr, :n_valid]  # (track, :3h duration) 
+
+        dur_hours = durations_hours[tr]   ### for index tr, get the duration of the track in hours
+        # frac_positions based on the actual 3-hourly steps, normalised by true duration
+        frac_positions = (np.arange(n_valid) * 3) / dur_hours
+        
+
+        frac_positions = np.clip(frac_positions, 0, 1)  ## why is this necessary? shouldn't be 
+        
+
+        bin_edges = np.linspace(0, 1, n_bins + 1) ## to define n_bins (widths), you need n + 1 edges
+        
+                    
+        bin_idx = np.digitize(frac_positions, bin_edges) - 1
+        bin_idx = np.clip(bin_idx, 0, n_bins - 1)
+        for b in range(n_bins):
+            vals = valid_var[bin_idx == b]
+            if len(vals) > 0 and not np.all(np.isnan(vals)):
+                binned_var[tr, b] = np.nanmean(vals)
+            
+    lifecycle_mean_var = np.nanmean(binned_var, axis=0)
+    lifecycle_pctg = np.linspace(0, 100, n_bins)
+
+    return lifecycle_mean_var, lifecycle_pctg
+
+
+def plot_PE_normalized_lifecycle(surface='all'): 
 
     fig, ax = plt.subplots()
 
@@ -149,61 +207,31 @@ def plot_PE_normalized_lifecycle():
         dstracks = TRACKS_DICT[mname]
 
         PE_zarr = xr.open_zarr(f'{BASE_PATH}{model_pid}/mcs_precip_efficiency_wam.zarr')
-
-
         track_ids = PE_zarr.tracks.values  # mask values
-        track_indices = track_ids - 1       # convert to dstracks indices
-
-        dstracks.track_duration.load()
-        durations_hours = dstracks.track_duration.isel(tracks=track_indices).values  # (n_tracks,) in hours
-
-        cr_values = PE_zarr.precip_eff.values  # (tracks, times_3h)
-        n_tracks, n_times = cr_values.shape  # (tracks, times_3h)
-
-
-        # build normalised lifecycle arrays
-        n_bins = 20  # resolution of normalised lifecycle
-        binned_cr_contrs = np.full((n_tracks, n_bins), np.nan)
         
-        for tr in range(n_tracks):
-            n_valid = (~np.isnan(cr_values[tr])).sum()  
-
-            ## number of valid timesteps in times_3h
-            if n_valid < 2:  ## doesn't compute if only 1 timestep
-                continue
-            valid_cr = cr_values[tr, :n_valid]  # (track, :3h duration) 
-            
-            dur_hours = durations_hours[tr]   ### for index tr, get the duration of the track in hours
-            # frac_positions based on the actual 3-hourly steps, normalised by true duration
-            frac_positions = (np.arange(n_valid) * 3) / dur_hours
+        pe_values = PE_zarr.precip_eff.values
+        
+        pe_values, durations_hours = surface_filtering(pe_values, dstracks, track_ids, 
+                                                       surface)
+                                        
+        n_tracks, _ = pe_values.shape  # (tracks, times_3h)
 
 
-            frac_positions = np.clip(frac_positions, 0, 1)  ## why is this necessary? shouldn't be 
-            
-            bin_edges = np.linspace(0, 1, n_bins + 1)  ## to define n_bins (widths), you need n + 1 edges
-            bin_idx = np.digitize(frac_positions, bin_edges) - 1
-            bin_idx = np.clip(bin_idx, 0, n_bins - 1)
-            for b in range(n_bins):
-                vals = valid_cr[bin_idx == b]
-                if len(vals) > 0:
-                    binned_cr_contrs[tr, b] = np.nanmean(vals)
-
-        lifecycle_mean_cr_contr = np.nanmean(binned_cr_contrs, axis=0)
-        lifecycle_pctg = np.linspace(0, 100, n_bins)
-
-        ax.plot(lifecycle_pctg, lifecycle_mean_cr_contr, color=color, label=mname)
+        lifecycle_mean_pe, lifecycle_pctg = binned_norm_lifecycle(n_tracks, pe_values, durations_hours)
+    
+        ax.plot(lifecycle_pctg, lifecycle_mean_pe, color=color, label=mname)
 
     ax.legend(bbox_to_anchor = (1.2, 1.3), ncols=3)
-    ax.set_xlabel(r"$\%$ of MCS lifecyle")
+    ax.set_xlabel(r"$\%$" + f" of {surface} MCS lifecyle")
     ax.set_ylabel(r"Precip Efficiency")
     ax.set_ylim(0.2, 1.)
     ax.grid(color='white')
 
-    plt.savefig('figs/PE_normalized_lifecycle.pdf', bbox_inches = 'tight', dpi=300)
+    plt.savefig(f'figs/PE_normalized_lifecycle_{surface}.pdf', bbox_inches = 'tight', dpi=300)
+    plt.savefig(f'figs/PE_normalized_lifecycle_{surface}.png', bbox_inches = 'tight')
 
 
-
-def plot_cr_pr_lifecycle():     
+def plot_cr_pr_lifecycle(surface='all'):     
     fig, ax = plt.subplots()
     ax1 = ax.twinx()
 
@@ -216,71 +244,40 @@ def plot_cr_pr_lifecycle():
 
 
         track_ids = PE_zarr.tracks.values  # mask values
-        track_indices = track_ids - 1       # convert to dstracks indices
-
-        dstracks.track_duration.load()
-        durations_hours = dstracks.track_duration.isel(tracks=track_indices).values  # (n_tracks,) in hours
-
+    
         cr_values = PE_zarr.condensation_rate.values 
-        pr_values = PE_zarr.precip_flux.values # (tracks, times_3h)
-        n_tracks, n_times = cr_values.shape  # (tracks, times_3h)
-
-
-        # build normalised lifecycle arrays
-        n_bins = 20  # resolution of normalised lifecycle
-        binned_cr_contrs = np.full((n_tracks, n_bins), np.nan)
-        binned_pr = np.full((n_tracks, n_bins), np.nan)
+        pr_values = PE_zarr.precip_flux.values
         
-        for tr in range(n_tracks):
-            n_valid = (~np.isnan(cr_values[tr])).sum()  
-            
-            ## number of valid timesteps in times_3h
-            if n_valid < 2:  ## doesn't compute if only 1 timestep
-                continue
-            
-            valid_cr = cr_values[tr, :n_valid]  # (track, :3h duration) 
-            valid_pr = pr_values[tr, :n_valid]
+        cr_values, durations_hours = surface_filtering(cr_values, dstracks, track_ids, 
+                                                       surface)
+        
+        pr_values, durations_hours = surface_filtering(pr_values, dstracks, track_ids, 
+                                                       surface)
+        
+        
+        n_tracks, _ = cr_values.shape  # (tracks, times_3h)
 
-            dur_hours = durations_hours[tr]   ### for index tr, get the duration of the track in hours
-            # frac_positions based on the actual 3-hourly steps, normalised by true duration
-            frac_positions = (np.arange(n_valid) * 3) / dur_hours
-            
 
-            frac_positions = np.clip(frac_positions, 0, 1)  ## why is this necessary? shouldn't be 
-            
+         
 
-            bin_edges = np.linspace(0, 1, n_bins + 1) ## to define n_bins (widths), you need n + 1 edges
-            
-                        
-            bin_idx = np.digitize(frac_positions, bin_edges) - 1
-            bin_idx = np.clip(bin_idx, 0, n_bins - 1)
-            for b in range(n_bins):
-                vals = valid_cr[bin_idx == b]
-                vals_pr = valid_pr[bin_idx == b]
-                if len(vals) > 0:
-                    binned_cr_contrs[tr, b] = np.nanmean(vals)
-                if len(vals_pr) > 0: 
-                    binned_pr[tr, b] = np.nanmean(vals_pr)   
-
-        lifecycle_mean_cr_contr = np.nanmean(binned_cr_contrs, axis=0)
-        lifecycle_mean_pr = np.nanmean(binned_pr, axis=0)
-        lifecycle_pctg = np.linspace(0, 100, n_bins)
-
-        ax.plot(lifecycle_pctg, lifecycle_mean_cr_contr, color=color, label=mname)
+        lifecycle_mean_cr, lifecycle_pctg = binned_norm_lifecycle(n_tracks, cr_values, durations_hours)
+        lifecycle_mean_pr, _ = binned_norm_lifecycle(n_tracks, pr_values, durations_hours)
+    
+        ax.plot(lifecycle_pctg, lifecycle_mean_cr, color=color, label=mname)
         ax1.plot(lifecycle_pctg, lifecycle_mean_pr, color=color, label=mname, linestyle='--')
 
     ax.plot([], [], color='grey', alpha=0.5, linestyle= '--', label='precip flux')
     ax.plot([], [], color='grey', alpha=0.5, linestyle= '-', label='condensation rate')
     ax.legend(bbox_to_anchor = (1.5, 1.3), ncols=4)
-    ax.set_xlabel(r"$\%$ of MCS lifecyle")
-    ax.set_ylabel(r"Condensation rate [kg m$^2$ s$^{-1}$]")
-    ax1.set_ylabel(r"Precipitation flux [kg m$^2$ s$^{-1}$]")
+    ax.set_xlabel(r"$\%$" + f' of {surface} MCS lifecyle')
+    ax.set_ylabel(r"Condensation rate [kg m$^{-2}$ s$^{-1}$]")
+    ax1.set_ylabel(r"Precipitation flux [kg m$^{-2}$ s$^{-1}$]")
     # ax.set_ylim(0.2, 1.)
     ax.spines['right'].set_visible(True)
     ax.grid(color='white')
 
     plt.savefig('figs/cr_pr_MCS_lifecycle.pdf', bbox_inches = 'tight', dpi=300)
-
+    plt.savefig(f'figs/cr_pr_MCS_lifecycle_{surface}.png', bbox_inches = 'tight')
 
 def plot_contribution_to_total_cr(): 
 
@@ -335,7 +332,7 @@ def plot_contribution_to_total_cr():
             bin_idx = np.clip(bin_idx, 0, n_bins - 1)
             for b in range(n_bins):
                 vals = pctg_contr[bin_idx == b]
-                if len(vals) > 0:
+                if len(vals) > 0 and not np.all(np.isnan(vals)):
                     binned_cr_contrs[tr, b] = np.nanmean(vals)
 
         lifecycle_mean_cr_contr = np.nanmean(binned_cr_contrs, axis=0)
@@ -358,20 +355,23 @@ print("plot 1")
 plot_mcs_stats_PE()
 
 
-print("plot 2")
+print("plot 2-4")
 
 
 plot_PE_normalized_lifecycle()
+plot_PE_normalized_lifecycle(surface='land')
+plot_PE_normalized_lifecycle(surface='ocean')
 
-print("plot 3")
+print("plot 5-7")
 
 
 plot_cr_pr_lifecycle()
+plot_cr_pr_lifecycle(surface='land')
+plot_cr_pr_lifecycle(surface='ocean')
 
+# print("plot 6")
 
-print("plot 4")
-
-plot_contribution_to_total_cr()
+# plot_contribution_to_total_cr()
 
 
 
