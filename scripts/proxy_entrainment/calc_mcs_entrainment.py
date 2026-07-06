@@ -124,7 +124,7 @@ def compute_track_entrainment(entr_ds, mask_ds, dstracks_wam,
         mask_global = np.nan_to_num(mask_global, nan=0.0)
         mask_wam    = mask_global[wam_positions].astype(np.int32)
 
-        active_nums = np.unique(mask_wam[mask_wam > 0])
+        active_nums = np.unique(mask_wam[mask_wam > 0]) ## number of active tracks at any one time
         if len(active_nums) == 0:
             continue
 
