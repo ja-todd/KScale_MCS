@@ -209,13 +209,25 @@ def build_output_dataset(arrays, base_time_out, dstracks_wam, times_3h):
         dstracks_wam.end_basetime.values, dims=['tracks'],
         attrs={'description': 'Track end time'}
     )
+
+    n_times_needed = MAX_TIMES_3H * 3
+    meanlat_vals = dstracks_wam.meanlat.values
+    meanlon_vals = dstracks_wam.meanlon.values
+
+    if meanlat_vals.shape[1] < n_times_needed:
+        pad_width = n_times_needed - meanlat_vals.shape[1]
+        meanlat_vals = np.pad(meanlat_vals, ((0, 0), (0, pad_width)), constant_values=np.nan)
+        meanlon_vals = np.pad(meanlon_vals, ((0, 0), (0, pad_width)), constant_values=np.nan)
+
+
+
     data_vars['meanlat'] = xr.DataArray(
-        dstracks_wam.meanlat.values[:, :MAX_TIMES_3H * 3:3],  # downsample 1h→3h
+        meanlat_vals[:, :n_times_needed:3],
         dims=['tracks', 'times_3h'],
         attrs={'description': 'MCS centroid latitude (hourly, downsampled to 3-hourly)'}
     )
     data_vars['meanlon'] = xr.DataArray(
-        dstracks_wam.meanlon.values[:, :MAX_TIMES_3H * 3:3],
+        meanlon_vals[:, :n_times_needed:3],
         dims=['tracks', 'times_3h'],
         attrs={'description': 'MCS centroid longitude (hourly, downsampled to 3-hourly)'}
     )
@@ -276,9 +288,14 @@ def main():
     entr_ds          = open_entrainment()
     mask_ds          = open_mcs_mask(MASK_URL)
 
+    
+
     wam_positions    = compute_wam_positions(entr_ds, mask_ds)
     dstracks_wam     = filter_region_tracks(dstracks, region_cfg)
     dstracks_wam     = filter_surface(dstracks_wam, args.surface)
+
+    print(dstracks_wam.meanlat.shape)
+    print(MAX_TIMES_3H * 3)
 
     entr_idxs, mask_idxs, times_3h = align_times(entr_ds, mask_ds)
 
