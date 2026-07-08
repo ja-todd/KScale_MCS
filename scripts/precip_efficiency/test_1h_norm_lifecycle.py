@@ -88,7 +88,11 @@ def _1h_lifecycle(input_zarr, times_3h, dstracks_wam, model, region):
     
     bin_values = [[] for _ in range(n_bins)]
 
+    print("starting loop")
+
     for out_i in range(n_tracks): 
+        if out_i % 100 == 0:
+            print(f'  out_i {out_i}/{n_tracks}', flush=True)
         t_start_idx = first_3h_step[out_i]  ## index, not actual time
         start_time = start_times[out_i]
         closest_3h_idx = np.searchsorted(times_3h, start_time)
@@ -96,7 +100,7 @@ def _1h_lifecycle(input_zarr, times_3h, dstracks_wam, model, region):
 
         offset = int((closest_3h_time - start_time) / np.timedelta64(1, 'h'))
 
-        cr_track = cr[out_i] # (times_3h, cell)
+        cr_track = cr[out_i] # (times_3h)
         pr_track = pr[out_i]
 
         n_active    = int(np.ceil(durations[out_i] / 3))
@@ -109,12 +113,13 @@ def _1h_lifecycle(input_zarr, times_3h, dstracks_wam, model, region):
             if bin_idx < 0 or bin_idx >= n_bins:
                 continue
             
-            if np.isnan(valid_cr) or valid_cr == 0 or np.isnan(valid_pr):
-                continue
+            
         
             valid_cr = cr_track[li]
             valid_pr = pr_track[li]
             
+            if np.isnan(valid_cr) or valid_cr == 0 or np.isnan(valid_pr):
+                continue
             
 
             PE_t = valid_pr / valid_cr
