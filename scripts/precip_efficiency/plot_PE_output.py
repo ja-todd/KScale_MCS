@@ -137,7 +137,7 @@ for mname in MNAMES:
     TRACKS_DICT[mname] = dstracks
 
 
-def surface_filtering(var_values, dstracks, track_ids, surface='all'): 
+def surface_duration_filtering(var_values, dstracks, track_ids, surface='all', duration='all'): 
     full_track_indices = track_ids - 1       # convert to dstracks indices
     valid_track_mask = full_track_indices < dstracks.sizes['tracks']
     full_track_indices = full_track_indices[valid_track_mask]
@@ -147,6 +147,18 @@ def surface_filtering(var_values, dstracks, track_ids, surface='all'):
     dstracks.meanlat.load()
 
     durations_hours = dstracks.track_duration.isel(tracks=full_track_indices).values
+
+    ## filter duration 
+    if duration == 'all': 
+        pass
+
+    if duration == 'short': 
+        dstracks = dstracks.isel(tracks=(durations_hours < 10))
+
+    elif duration == 'long': 
+        dstracks = dstracks.isel(tracks=(durations_hours >= 10))
+
+
 
     dstracks_surface = utils.filter_surface(dstracks, surface)
     surface_track_indices = dstracks_surface.tracks.values
@@ -197,9 +209,10 @@ def binned_norm_lifecycle(n_tracks, var_values, durations_hours, n_bins=20):
     return lifecycle_mean_var, lifecycle_pctg
 
 
-def plot_PE_normalized_lifecycle(surface='all'): 
+def plot_PE_normalized_lifecycle(surface='all', duration='all'): 
 
     fig, ax = plt.subplots()
+    # ax1 = ax.twinx()
 
     for mname, color in zip(MNAMES, COLORS): 
         model_pid = models_dict[mname]['path_id']
@@ -207,23 +220,33 @@ def plot_PE_normalized_lifecycle(surface='all'):
         dstracks = TRACKS_DICT[mname]
 
         PE_zarr = xr.open_zarr(f'{BASE_PATH}{model_pid}/mcs_precip_efficiency_wam.zarr')
+        entr_ds = xr.open_dataset(f'/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data/{model_pid}/mcs_entrainment_wam.nc')
+
         track_ids = PE_zarr.tracks.values  # mask values
         
         pe_values = PE_zarr.precip_eff.values
+        tbdiff_values = entr_ds.tb_diff_mean
         
-        pe_values, durations_hours = surface_filtering(pe_values, dstracks, track_ids, 
-                                                       surface)
+        # print(tbdiff_values.shape)
+
+        pe_values, durations_hours = surface_duration_filtering(pe_values, dstracks, track_ids, 
+                                                       surface, duration)
+        # tbdiff_values, _ = surface_duration_filtering(tbdiff_values, dstracks, track_ids, surface, duration)
+
                                         
         n_tracks, _ = pe_values.shape  # (tracks, times_3h)
 
 
-        lifecycle_mean_pe, lifecycle_pctg = binned_norm_lifecycle(n_tracks, pe_values, durations_hours)
+        lifecycle_mean_pe, lifecycle_pctg            = binned_norm_lifecycle(n_tracks, pe_values, durations_hours)
+        # lifecycle_mean_tbdiff, lifecycle_tbdiff_pctg = binned_norm_lifecycle(n_tracks, tbdiff_values, durations_hours)
     
         ax.plot(lifecycle_pctg, lifecycle_mean_pe, color=color, label=mname)
+        # ax.plot(lifecycle_tbdiff_pctg, lifecycle_mean_tbdiff, color=color, linestyle='--')
 
     ax.legend(bbox_to_anchor = (1.2, 1.3), ncols=3)
-    ax.set_xlabel(r"$\%$" + f" of {surface} MCS lifecyle")
+    ax.set_xlabel(r"$\%$" + f" of {surface} MCS lifecycle")
     ax.set_ylabel(r"Precip Efficiency")
+    # ax1.set_ylabel(r'T$_b$ diff [K]')
     ax.set_ylim(0.2, 1.)
     ax.grid(color='white')
 
@@ -248,10 +271,10 @@ def plot_cr_pr_lifecycle(surface='all'):
         cr_values = PE_zarr.condensation_rate.values 
         pr_values = PE_zarr.precip_flux.values
         
-        cr_values, durations_hours = surface_filtering(cr_values, dstracks, track_ids, 
+        cr_values, durations_hours = surface_duration_filtering(cr_values, dstracks, track_ids, 
                                                        surface)
         
-        pr_values, durations_hours = surface_filtering(pr_values, dstracks, track_ids, 
+        pr_values, durations_hours = surface_duration_filtering(pr_values, dstracks, track_ids, 
                                                        surface)
         
         
@@ -350,24 +373,24 @@ def plot_contribution_to_total_cr():
 
 
 
-print("plot 1")
+# print("plot 1")
 
-plot_mcs_stats_PE()
+# plot_mcs_stats_PE()
 
 
-print("plot 2-4")
+# print("plot 2-4")
 
 
 plot_PE_normalized_lifecycle()
-plot_PE_normalized_lifecycle(surface='land')
-plot_PE_normalized_lifecycle(surface='ocean')
+# plot_PE_normalized_lifecycle(surface='land')
+# plot_PE_normalized_lifecycle(surface='ocean')
 
-print("plot 5-7")
+# print("plot 5-7")
 
 
-plot_cr_pr_lifecycle()
-plot_cr_pr_lifecycle(surface='land')
-plot_cr_pr_lifecycle(surface='ocean')
+# plot_cr_pr_lifecycle()
+# plot_cr_pr_lifecycle(surface='land')
+# plot_cr_pr_lifecycle(surface='ocean')
 
 # print("plot 6")
 
