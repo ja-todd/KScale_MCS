@@ -38,12 +38,12 @@ For the first MCS, you have data at its 3rd timestep.
 """
 
 def compute_donefile(model, region):
-    return models.done_dir(model) / f'mcs_PE_lifecycle_{region}_test.done'
+    return models.done_dir(model) / f'mcs_PE_tbdiff_lifecycle_{region}.done'
 
 def nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
-def _1h_lifecycle(input_zarr, times_3h, dstracks_wam, model, region): 
+def _1h_lifecycle(input_zarr, entr_ds, times_3h, dstracks_wam, model, region): 
     """
     Overall aim (I think): 
 
@@ -57,87 +57,131 @@ def _1h_lifecycle(input_zarr, times_3h, dstracks_wam, model, region):
     Still trying to figure this out
 
     """
-    done_file = compute_donefile(model, region)
-    if done_file.exists(): 
+    done_file = models.done_dir(model) / f'lifecycle_PE_tbdiff_{region}.done'
+    if done_file.exists():
         print(f"1h lifecycle computation complete for {model} and {region}")
         return
-    ## input data has dimensions (track, times_3h)
+
     print("computation started")
-    
-    ## tracks has the same length as dstracks_wam 
-    cr = input_zarr.cr_mean.values
-    pr = input_zarr.pr_mean.values
 
-    print("both cr and pr computed")
+    cr     = input_zarr.cr_mean.values    # (n_tracks, MAX_TIMES_3H)
+    pr     = input_zarr.pr_mean.values    # (n_tracks, MAX_TIMES_3H)
+    tbdiff = entr_ds.tb_diff_mean.values  # (n_tracks, MAX_TIMES_3H)
+    w_eff = entr_ds.w_eff_mean.values
 
-    # First 3-hourly step index for each WAM track (index into times_3h array)
-    start_times = dstracks_wam.start_basetime.values   # (n_tracks,)
-    first_3h_step = np.searchsorted(times_3h, start_times)  
 
-    
+    print("cr, pr, tbdiff loaded")
+
     dstracks_wam.track_duration.load()
-    durations = dstracks_wam.track_duration.values
+    track_durations = dstracks_wam.track_duration.values
+
     
 
-    ### want to output, for track id x, at cells where track id is, for 3h indices where track is, the 
-    ## condensation rates, precip rates
+    duration_filters = {
+        'all':   None,
+        'short': track_durations < 10,
+        'long':  track_durations >= 10,
+    }
+
+    n_bins_dict = {
+        'all': 24, 
+        'short': 8, 
+        'long': 24
+
+
+    }
+
+    ds_lifecycle = xr.Dataset()
+
     n_steps = len(times_3h)
-    n_tracks = len(dstracks_wam.tracks)
-    
-    n_bins = 24 
-    
-    bin_values = [[] for _ in range(n_bins)]
 
-    print("starting loop")
-
-    for out_i in range(n_tracks): 
-        if out_i % 100 == 0:
-            print(f'  out_i {out_i}/{n_tracks}', flush=True)
-        t_start_idx = first_3h_step[out_i]  ## index, not actual time
-        start_time = start_times[out_i]
-        closest_3h_idx = np.searchsorted(times_3h, start_time)
-        closest_3h_time = times_3h[closest_3h_idx]
-
-        offset = int((closest_3h_time - start_time) / np.timedelta64(1, 'h'))
-
-        cr_track = cr[out_i] # (times_3h)
-        pr_track = pr[out_i]
-
-        n_active    = int(np.ceil(durations[out_i] / 3))
-        t_end_idx   = min(t_start_idx + n_active + 2, n_steps)
-
-        for step in range(t_start_idx, t_end_idx): 
-            li = step - t_start_idx
-            dur = durations[out_i]
-            bin_idx = int(((offset + li * 3) / dur) * n_bins)
-            if bin_idx < 0 or bin_idx >= n_bins:
-                continue
-            
-            
+    for duration_label, mask in duration_filters.items():
         
-            valid_cr = cr_track[li]
-            valid_pr = pr_track[li]
-            
-            if np.isnan(valid_cr) or valid_cr == 0 or np.isnan(valid_pr):
-                continue
-            
+        print(f"processing {duration_label} tracks ...")
+        n_bins = n_bins_dict[duration_label]
 
-            PE_t = valid_pr / valid_cr
-
-            bin_values[bin_idx].append(float(PE_t))
-
-    lifecycle_mean_PE = np.array([np.nanmean(b) if len(b) > 0 else np.nan for b in bin_values])
-    lifecycle_pctg = np.linspace(0, 100, n_bins)  
-
-    ds_lifecycle = xr.Dataset({
-    'lifecycle_mean_PE': xr.DataArray(lifecycle_mean_PE, dims=['lifecycle_pctg'],
-                                      attrs={'description': '1h normalised lifecycle mean PE'}),
-    },
-    coords={'lifecycle_pctg': lifecycle_pctg})
-
-    ds_lifecycle.to_netcdf(models.data_dir(model, VAR) / f'lifecycle_PE_{region}.nc')
+        lifecycle_pctg = np.linspace(0, 100, n_bins)
+        
 
 
+        if mask is not None:
+            dstracks_filtered  = dstracks_wam.isel(tracks=mask)
+            filtered_indices   = np.where(mask)[0]
+        else:
+            dstracks_filtered  = dstracks_wam
+            filtered_indices   = np.arange(len(dstracks_wam.tracks))
+
+        start_times   = dstracks_filtered.start_basetime.values
+        first_3h_step = np.searchsorted(times_3h, start_times)
+        durations     = dstracks_filtered.track_duration.values
+        n_tracks      = len(dstracks_filtered.tracks)
+
+        PE_bin_values     = [[] for _ in range(n_bins)]
+        tbdiff_bin_values = [[] for _ in range(n_bins)]
+        w_eff_bin_values = [[] for _ in range(n_bins)]
+
+
+        for out_i in range(n_tracks):
+            if out_i % 100 == 0:
+                print(f'  out_i {out_i}/{n_tracks}', flush=True)
+
+            zarr_idx    = filtered_indices[out_i]
+            t_start_idx = first_3h_step[out_i]
+            start_time  = start_times[out_i]
+
+            closest_3h_idx  = np.searchsorted(times_3h, start_time)
+            closest_3h_time = times_3h[closest_3h_idx]
+            offset          = int((closest_3h_time - start_time) / np.timedelta64(1, 'h'))
+
+            cr_track     = cr[zarr_idx]      # (MAX_TIMES_3H,)
+            pr_track     = pr[zarr_idx]
+            tbdiff_track = tbdiff[zarr_idx]
+            w_eff_track = w_eff[zarr_idx]
+
+
+            dur       = durations[out_i]
+            n_active  = int(np.ceil(dur / 3))
+            t_end_idx = min(t_start_idx + n_active + 2, n_steps)
+
+            for step in range(t_start_idx, t_end_idx):
+                li      = step - t_start_idx
+                bin_idx = int(((offset + li * 3) / dur) * n_bins)
+                if bin_idx < 0 or bin_idx >= n_bins:
+                    continue
+
+                valid_cr     = cr_track[li]
+                valid_pr     = pr_track[li]
+                valid_tbdiff = tbdiff_track[li]
+                valid_w_eff = w_eff_track[li]
+
+                if np.isnan(valid_cr) or valid_cr == 0 or np.isnan(valid_pr):
+                    continue
+
+                PE_t = valid_pr / valid_cr
+
+                PE_bin_values[bin_idx].append(float(PE_t))
+                if not np.isnan(valid_tbdiff):
+                    tbdiff_bin_values[bin_idx].append(float(valid_tbdiff))
+                if not np.isnan(valid_w_eff): 
+                    w_eff_bin_values[bin_idx].append(float(valid_w_eff))
+
+        lifecycle_mean_PE     = np.array([np.nanmean(b) if len(b) > 0 else np.nan for b in PE_bin_values])
+        lifecycle_mean_tbdiff = np.array([np.nanmean(b) if len(b) > 0 else np.nan for b in tbdiff_bin_values])
+        lifecycle_mean_w_eff     = np.array([np.nanmean(b) if len(b) > 0 else np.nan for b in w_eff_bin_values])
+        
+        ds_lifecycle[f'lifecycle_pctg_{duration_label}'] = xr.DataArray(
+            lifecycle_pctg, dims=[f'lifecycle_pctg_{duration_label}'])
+        ds_lifecycle[f'lifecycle_mean_PE_{duration_label}'] = xr.DataArray(
+            lifecycle_mean_PE, dims=[f'lifecycle_pctg_{duration_label}'],
+            attrs={'description': f'1h normalised lifecycle mean PE ({duration_label} tracks)'})
+        ds_lifecycle[f'lifecycle_mean_tbdiff_{duration_label}'] = xr.DataArray(
+            lifecycle_mean_tbdiff, dims=[f'lifecycle_pctg_{duration_label}'],
+            attrs={'description': f'1h normalised lifecycle mean tb_diff ({duration_label} tracks)'})
+        ds_lifecycle[f'lifecycle_mean_weff_{duration_label}'] = xr.DataArray(
+            lifecycle_mean_w_eff, dims=[f'lifecycle_pctg_{duration_label}'],
+            attrs={'description': f'1h normalised lifecycle mean w_eff ({duration_label} tracks)'})
+
+    ds_lifecycle.to_netcdf(models.data_dir(model, VAR) / f'lifecycle_PE_tbdiff_{region}.nc')
     done_file.touch()
     print("Done")
 
@@ -174,7 +218,8 @@ def main():
     print("opening input zarr")
 
     input_zarr = xr.open_zarr(models.data_dir(args.model, VAR) / f'mcs_condensation_rate_{args.region}_stats.zarr') #(track, times_3h, cell)
-    _1h_lifecycle(input_zarr, times_3h, dstracks_wam, args.model, args.region)
+    entr_ds    = xr.open_dataset(models.data_dir(args.model) / 'mcs_entrainment_wam.nc')
+    _1h_lifecycle(input_zarr, entr_ds, times_3h, dstracks_wam, args.model, args.region)
     
 
     
