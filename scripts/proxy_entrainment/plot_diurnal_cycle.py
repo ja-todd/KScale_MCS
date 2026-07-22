@@ -61,8 +61,11 @@ def plot_region_map(ax, region_cfg, model_display, region_display):
     wam_lat_min = region_cfg['lat_min']
     wam_lat_max = region_cfg['lat_max']
 
-    ax.set_extent([wam_lon_min - 5, wam_lon_max + 5, wam_lat_min - 3, wam_lat_max + 3],
-                  crs=ccrs.PlateCarree())
+
+    proj = ccrs.Robinson()
+
+    ax.set_extent([wam_lon_min - 10, wam_lon_max + 10, wam_lat_min - 10, wam_lat_max + 10],
+                  crs=proj)
     ax.coastlines(linewidth=0.8)
     ax.add_feature(cf.BORDERS, linewidth=0.5)
     ax.add_feature(cf.LAND, facecolor='lightgrey', alpha=0.4)
@@ -72,14 +75,14 @@ def plot_region_map(ax, region_cfg, model_display, region_display):
         (wam_lon_min, wam_lat_min),
         wam_lon_max - wam_lon_min, wam_lat_max - wam_lat_min,
         linewidth=1.5, edgecolor='steelblue', facecolor='steelblue',
-        alpha=0.15, transform=crs, label=f'{region_display} region',
+        alpha=0.15, transform=proj, label=f'{region_display} region',
     ))
-    # ax.add_patch(mpatches.Rectangle(
-    #     (BF_LON_MIN, BF_LAT_MIN),
-    #     BF_LON_MAX - BF_LON_MIN, BF_LAT_MAX - BF_LAT_MIN,
-    #     linewidth=2, edgecolor='tab:orange', facecolor='none',
-    #     transform=crs, label='Burkina Faso box',
-    # ))
+    ax.add_patch(mpatches.Rectangle(
+        (BF_LON_MIN, BF_LAT_MIN),
+        BF_LON_MAX - BF_LON_MIN, BF_LAT_MAX - BF_LAT_MIN,
+        linewidth=2, edgecolor='tab:orange', facecolor='none',
+        transform=proj, label='Burkina Faso box',
+    ))
     ax.legend(loc='lower right', fontsize=8)
     ax.set_title(f'Analysis regions — {model_display}')
 
