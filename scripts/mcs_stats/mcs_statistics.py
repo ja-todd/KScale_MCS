@@ -1,42 +1,19 @@
 import time
-t0 = time.time()
 import src.hp_models as models 
-print(f"hp_models: {time.time()-t0:.1f}s")
-t0 = time.time()
 import src.hp_utils as utils
-print(f"hp_utils: {time.time()-t0:.1f}s")
-t0 = time.time() 
 import src.plot_utils as p_utils
-print(f"plot_utils: {time.time()-t0:.1f}s")
-t0 = time.time()
 import numpy as np 
-print(f"numpy: {time.time()-t0:.1f}s")
-t0 = time.time()
 import cartopy.crs as ccrs
-print(f"ccrs: {time.time()-t0:.1f}s")
-t0 = time.time()
-import matplotlib.pyplot as plt 
-print(f"plt: {time.time()-t0:.1f}s")
-t0 = time.time()
+import matplotlib.pyplot as plt
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
-print(f"axes_formatters: {time.time()-t0:.1f}s")
-t0 = time.time()
 import pickle
-print(f"pickle: {time.time()-t0:.1f}s")
-t0 = time.time()
-
 from pathlib import Path
-print(f"Path: {time.time()-t0:.1f}s")
-print(f"hp_models: {time.time()-t0:.1f}s")
-
 import pandas as pd
-print(f"pandas: {time.time()-t0:.1f}s")
-
 import easygems.healpix as egh
 
-t0 = time.time()
+## consistent plot formatting
 p_utils.apply_plot_style()
-print(f"time to apply plot style: {time.time()-t0:.1f}s")
+
 
 model_names = list(models.models_name_dict.keys())
 region_cfg = models.REGIONS['wam']
@@ -114,7 +91,7 @@ def mcs_spatial_dist():
     cbar_ax = fig.add_axes([0.9, 0.1, 0.02, 0.8])  # placeholder, will be resized
     cbar = fig.colorbar(im, cax=cbar_ax, label='Proportion of MCSs [%]')
     p_utils.match_colorbar_to_axes(fig, cbar, axs)
-    plt.savefig('MCS_spatial_dist.png', bbox_inches='tight')
+    plt.savefig('figs/MCS_spatial_dist.png', bbox_inches='tight')
 
 
 
@@ -228,7 +205,7 @@ def temp_gradient():
         axs[3].yaxis.set_tick_params(labelleft=False)   # bottom right - no left labels
 
         plt.subplots_adjust(hspace=0.15)
-        plt.savefig('pre-MCS_LLtemp_gradient+shear.png', bbox_inches='tight')
+        plt.savefig('figs/pre-MCS_LLtemp_gradient+shear.png', bbox_inches='tight')
 
 def init_time_dists(): 
     t0 = time.time()
@@ -252,7 +229,7 @@ def init_time_dists():
     ax.set_xlim(0, 23)
     ax.set_xticks(np.arange(0, 24, 3))
     ax.legend(bbox_to_anchor=(1.3, 1.15), frameon=False, ncols=4)
-    plt.savefig('MCS_init_hour_dist.png', bbox_inches='tight')
+    plt.savefig('figs/MCS_init_hour_dist.png', bbox_inches='tight')
     print(f"savefig: {time.time()-t0:.1f}s")
 # plt.subplots_adjust(right=0.4, hspace=0.1)
 # plt.savefig('MCS_spatial_dist.png')
