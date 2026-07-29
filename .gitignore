@@ -14,4 +14,4 @@ plot_mcs_mask.py
 plotting/
 notebooks/
 concat_ccic_files.py
-tracks_list_cache*
+*.pkl
