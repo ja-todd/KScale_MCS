@@ -49,6 +49,18 @@ MODELS = {
                                                 }
 }
 
+
+
+models_name_dict = {
+    'RAL3' : {'path_id': 'z9/um_glm_n2560_RAL3p3_tuned_hk26', 'color': '#0D0C6E'},
+    'GAL9' : {'path_id': 'z9/um_glm_n1280_GAL9_v2_hk26', 'color':'#AC2078'},
+    'COMORPH_n2560'     : {'path_id': 'z9/um_glm_n2560_CoMA9_hk26', 'color': '#BC6263'}, 
+    'COMORPH_n1280' : {'path_id': 'z9/um_glm_n1280_CoMA9_hk26', 'color':  '#B79394'},
+        
+}
+
+
+
 # Analysis regions.  lon_min/lon_max are in [0, 360]; if lon_min > lon_max the
 # region wraps across 0°.  buf_* bounds are in [-180, 180] and include a buffer
 # used for pre-filtering MCS track centroids.

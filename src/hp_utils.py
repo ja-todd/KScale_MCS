@@ -5,14 +5,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import src.hp_models as models
-import intake
-import easygems.healpix as egh
 import warnings
 
 warnings.filterwarnings('ignore', message='.*The return type of `Dataset.dims`.*', category=FutureWarning)
 
+_intake = None
+
+def _get_intake():
+    global _intake
+    if _intake is None:
+        import intake
+        _intake = intake
+    return _intake
+
 
 def hp_mods(ds):
+    import easygems.healpix as egh
     """Convert from CF-compliant to be compatible with egh, and attach lat/lon coords"""
     if 'healpix_index' in list(ds.dims): 
         return ds.rename({'healpix_index': 'cell'}).pipe(egh.attach_coords)
@@ -21,7 +29,9 @@ def hp_mods(ds):
 
 
 def plot_all_fields(ds_plot):
+    
     """Plot all fields for a given dataset. Assumes that each field is 2D - i.e. sel(time=..., [pressure=...]) has been applied"""
+    import easygems.healpix as egh
     zoom = ds_plot.crs.attrs['refinement_level']
     projection = ccrs.Robinson(central_longitude=0)
     # Do not plot orog, land surf.
@@ -93,7 +103,7 @@ def _region_mask(ds, region_cfg):
 def open_region_dataset(model, region_cfg):
     zoom = models.MODELS[model]['zoom']
     catalog_model_key = models.MODELS[model].get('catalog_key', model)
-    cat  = intake.open_catalog(models.CATALOG_URL)['UK']
+    cat  = _get_intake().open_catalog(models.CATALOG_URL)['UK']
     ds3h = cat[catalog_model_key](zoom=zoom, time='PT3H').to_dask().pipe(hp_mods)
     return ds3h.isel(cell=_region_mask(ds3h, region_cfg))
 
@@ -101,7 +111,7 @@ def open_region_dataset(model, region_cfg):
 def open_region_1h_dataset(model, region_cfg):
     zoom = models.MODELS[model]['zoom']
     catalog_model_key = models.MODELS[model].get('catalog_key', model)
-    cat  = intake.open_catalog(models.CATALOG_URL)['UK']
+    cat  = _get_intake().open_catalog(models.CATALOG_URL)['UK']
     ds1h = cat[catalog_model_key](zoom=zoom, time='PT1H').to_dask().pipe(hp_mods)
     return ds1h.isel(cell=_region_mask(ds1h, region_cfg))
 
@@ -109,7 +119,7 @@ def open_region_1h_dataset(model, region_cfg):
 def open_1h_dataset(model):
     zoom = models.MODELS[model]['zoom']
     catalog_model_key = models.MODELS[model].get('catalog_key', model)
-    cat  = intake.open_catalog(models.CATALOG_URL)['UK']
+    cat  = _get_intake().open_catalog(models.CATALOG_URL)['UK']
     ds1h = cat[catalog_model_key](zoom=zoom, time='PT1H').to_dask().pipe(hp_mods)
     return ds1h
 
