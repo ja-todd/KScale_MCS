@@ -10,80 +10,30 @@ import src.hp_utils as utils
 import src.hp_models as models 
 import xarray as xr 
 from scipy.ndimage import zoom
+import src.plot_utils as p_utils 
 
-plt.rcParams.update({
-    'font.family': 'sans-serif',
-    'font.sans-serif': ['Arial'],
-    'font.size': 15,
-    'axes.labelsize': 16,
-    'xtick.labelsize': 15,
-    'ytick.labelsize': 15,
-    'xtick.direction': 'out',
-    'ytick.direction': 'out',
-    'xtick.major.size': 6,
-    'ytick.major.size': 6,
-    'xtick.minor.size': 3,
-    'ytick.minor.size': 3,
-    'xtick.minor.visible': True,
-    'ytick.minor.visible': True,
-    'xtick.top': False,       # no top ticks (tmXTOn = False)
-    'ytick.right': False,
-    'ytick.left': True,     # no right ticks (tmYROn = False)
-    'axes.linewidth': 1.5,
-    'lines.linewidth': 2,
-    'axes.spines.top': False, 
-    'axes.spines.right': False,
-    'axes.facecolor':  "#EAEAF2E6",
-     
-    
-    'axes.grid': True, 
-    'grid.color': '#DEDFE4',
-    'grid.alpha': 0.5,
-    'figure.labelsize': '15', 
-    'font.weight': 'normal', 
-    'legend.handlelength': 2, 
-    'legend.handletextpad': 0.5, 
-    'legend.frameon': False, 
-})
+p_utils.apply_plot_style()
+
+# models_dict = {
+#     'RAL3_z10_4k' : {'path_id':'z10/um_glm_n2560_RAL3p3_tuned_sahel_z10_t4k', 'color': '#6893DA'},
+#     'RAL3_z10_40k' : {'path_id':'z10/um_glm_n2560_RAL3p3_tuned_sahel_z10_t40k', 'color': '#782078' },
+#     'RAL3_z9' : {'path_id': 'z9/um_glm_n2560_RAL3p3_tuned_hk26', 'color': '#0D0C6E'},
+#     'GAL9' : {'path_id': 'z9/um_glm_n1280_GAL9_v2_hk26', 'color':'#AC2078'},
+#     'COMORPH_n2560_z9'     : {'path_id': 'z9/um_glm_n2560_CoMA9_hk26', 'color': '#BC6263'}, 
+#     'COMORPH_n1280' : {'path_id': 'z9/um_glm_n1280_CoMA9_hk26', 'color':  '#B79394'},
+# }
 
 
-models_dict = {
-    'RAL3_z10_4k' : {'path_id':'z10/um_glm_n2560_RAL3p3_tuned_sahel_z10_t4k', 'color': '#6893DA'},
-    'RAL3_z10_40k' : {'path_id':'z10/um_glm_n2560_RAL3p3_tuned_sahel_z10_t40k', 'color': '#782078' },
-    'RAL3_z9' : {'path_id': 'z9/um_glm_n2560_RAL3p3_tuned_hk26', 'color': '#0D0C6E'},
-    'GAL9' : {'path_id': 'z9/um_glm_n1280_GAL9_v2_hk26', 'color':'#AC2078'},
-    'COMORPH_n2560_z9'     : {'path_id': 'z9/um_glm_n2560_CoMA9_hk26', 'color': '#BC6263'}, 
-    'COMORPH_n1280' : {'path_id': 'z9/um_glm_n1280_CoMA9_hk26', 'color':  '#B79394'},
-    
-    
-}
-
+models_dict = models.models_name_dict
 BASE_PATH = '/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data'
 PE_BASE_PATH = '/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data'
 MNAMES = list(models_dict.keys())[2:]
 COLORS = [models_dict[mname]['color'] for mname in MNAMES]
 
 
-
-model_choices = ['um_glm_n2560_RAL3p3_tuned_hk26', 'um_glm_n2560_CoMA9_hk26', 'um_glm_n1280_GAL9_v2_hk26']
-model_display_names = ['RAL3 z9', 'CORMORPH n2560 z9', 'COMORPH n1280 z9']
 durations = ['all', 'short', 'long']
 seasons = ['all', 'jja', 'djf']
 surfaces = ['all', 'land', 'ocean']
-choice_colors = ['#0D0C6E', '#BC6263', '#BBCBDF' ]
-new_cmap = cmr.get_sub_cmap('inferno', 0.3, 0.9)
-### run from here
-
-UNITS = {
-    'shear': r'm s$^{-1}$', 
-    'tbdiff': r'K', 
-    'cr': r'mm hr$^{-1}$',
-    'pr': r'mm hr$^{-1}$',
-    'condensation_rate': r'kg m$^{-2}$ s$^{-1}$', 
-    'surface_precip': r'kg m$^{-2}$ s$^{-1}$', 
-}
-
-
 
 
 

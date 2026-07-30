@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 import easygems.healpix as egh
 
-## consistent plot formatting
+
 p_utils.apply_plot_style()
 
 
