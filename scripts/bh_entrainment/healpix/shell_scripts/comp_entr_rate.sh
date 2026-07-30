@@ -11,8 +11,8 @@ for model in "${MODELS[@]}"; do
     for radius in "${RADII[@]}"; do
         for surface in "${SURFACES[@]}"; do
                 echo "Running model=$model radius=$radius surface=$surface"
-                python compute_entrainment_rate.py --init --model "$model" --radius "$radius" --surface "$surface"
-                python compute_entrainment_rate.py --run  --model "$model" --radius "$radius" --surface "$surface"
+                python ../compute_entrainment_rate.py --init --model "$model" --radius "$radius" --surface "$surface"
+                python ../compute_entrainment_rate.py --run  --model "$model" --radius "$radius" --surface "$surface"
 	    done
     done
 done
