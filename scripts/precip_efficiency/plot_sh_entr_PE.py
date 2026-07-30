@@ -631,7 +631,7 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
                     shear_entr_ds = shear_entr_ds.sel(tracks=mask_tracks)
                     pe_ds = pe_ds.sel(track=mask_tracks)
 
-                    # --- Raw (non-lifetime-mean) data ---
+                    # non-lifetime-mean 
                     cr_raw = (pe_ds.cr_mean * 3600).values
                     pr_raw = (pe_ds.pr_mean * 3600).values
                     pe_raw = pe_ds.pe_mean.values
@@ -639,7 +639,7 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
                     valid_raw = ~np.isnan(cr_raw) & ~np.isnan(pr_raw) & ~np.isnan(pe_raw)
                     cr_raw, pr_raw, pe_raw = cr_raw[valid_raw], pr_raw[valid_raw], pe_raw[valid_raw]
 
-                    # --- Lifetime-mean data ---
+                    # lifetime-mean
                     cr_lt = (pe_ds.cr_mean * 3600).mean(dim='times_3h', skipna=True).values
                     pr_lt = (pe_ds.pr_mean * 3600).mean(dim='times_3h', skipna=True).values
                     pe_lt = pe_ds.pe_mean.mean(dim='times_3h', skipna=True).values
@@ -647,32 +647,32 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
                     valid_lt = ~np.isnan(cr_lt) & ~np.isnan(pr_lt) & ~np.isnan(pe_lt)
                     cr_lt, pr_lt, pe_lt = cr_lt[valid_lt], pr_lt[valid_lt], pe_lt[valid_lt]
 
-                    # --- Bin the raw data — this defines the shared grid (clip=True computes 5th-95th percentile edges) ---
+                    # define the share grid with the raw data + clip between 5th and 95th percentile
                     cr_edges, pr_edges, counts_raw = binned_stats(cr_raw, pr_raw, pe_raw, nx=20, statistic='count', clip=True)
 
-                    # --- Bin the lifetime-mean data onto the SAME edges (no separate clip, so grids stay aligned) ---
+                    # Bin the lifetime-mean data onto the shared grid
                     counts_lt, _, _, _ = binned_statistic_2d(cr_lt, pr_lt, pe_lt, statistic='count', bins=[cr_edges, pr_edges])
 
-                    # --- Colored bins = raw data, as percentage of valid raw MCSs ---
+                    # histogram bins (colors)
                     n_valid_raw = counts_raw.sum()
                     percentages_raw = (counts_raw.T / n_valid_raw) * 100
 
                     plot = ax_joint.pcolormesh(cr_edges, pr_edges, percentages_raw, cmap=cmap, vmin=0, vmax=1.5)
                     fig.colorbar(plot, cax=cbar_ax, label=r'$\%$ MCSs')
 
-                    # --- Contour = lifetime-mean data, as percentage of valid lifetime-mean MCSs ---
+                    # contours for the lifetime mean data
                     xcenters = (cr_edges[:-1] + cr_edges[1:]) / 2
                     ycenters = (pr_edges[:-1] + pr_edges[1:]) / 2
                     n_valid_lt = counts_lt.sum()
                     percentages_lt = (counts_lt.T / n_valid_lt) * 100
 
-                    # Mask zero bins so they aren't traced as a contour level
+                    # Mask zero bins 
                     percentages_lt_masked = np.where(percentages_lt == 0, np.nan, percentages_lt)
 
-                    # Explicit levels, skipping the low end (avoids near-zero contour clutter)
+                    # set the contour levels
                     levels = np.linspace(np.nanpercentile(percentages_lt_masked, 10), np.nanmax(percentages_lt_masked), 3)
 
-                    # Upsample onto a finer grid via cubic interpolation for smoother-looking contours
+                    # smooth contours
                     zoom_factor = 4
                     percentages_lt_upsampled = zoom(np.nan_to_num(percentages_lt_masked), zoom=zoom_factor, order=3)
 
@@ -681,17 +681,17 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
 
                     contour_plot = ax_joint.contour(
                         xcenters_fine, ycenters_fine, percentages_lt_upsampled,
-                        colors='red', levels=levels, linewidth=2
+                        colors='red', levels=levels, linewidths=2.5
                     )
                     ax_joint.clabel(contour_plot, inline=True, fontsize=10)
 
-                    # --- Marginals (raw = black, lifetime-mean = red) ---
+                    # marginal plots
                     sns.histplot(x=cr_raw, ax=ax_marg_x, color='black', stat='density', bins=20, kde=True)
                     sns.histplot(y=pr_raw, ax=ax_marg_y, color='black', stat='density', bins=20, kde=True)
                     sns.kdeplot(x=cr_lt, ax=ax_marg_x, color='red', linewidth=2)
                     sns.kdeplot(y=pr_lt, ax=ax_marg_y, color='red', linewidth=2)  # fixed: was ax_marg_x
 
-                    # --- 1:1 reference line ---
+                    # 1:1 line
                     lims = [min(cr_raw.min(), pr_raw.min()), max(cr_raw.max(), pr_raw.max())]
                     ax_joint.axline((lims[0], lims[0]), (lims[1], lims[1]), linestyle='--', color='black')
 
