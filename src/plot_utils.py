@@ -1,5 +1,13 @@
 import matplotlib.pyplot as plt 
 
+UNITS = {
+    'shear': r'm s$^{-1}$', 
+    'tbdiff': r'K', 
+    'cr': r'mm hr$^{-1}$',
+    'pr': r'mm hr$^{-1}$',
+    'condensation_rate': r'kg m$^{-2}$ s$^{-1}$', 
+    'surface_precip': r'kg m$^{-2}$ s$^{-1}$', 
+}
 
 def apply_plot_style(): 
     """
@@ -58,3 +66,4 @@ def match_colorbar_to_axes(fig, cbar, axs):
         0.02,            # colorbar width
         y_max - y_min    # match full height of axes
     ])
+
