@@ -9,6 +9,7 @@ import seaborn as sns
 import src.hp_utils as utils 
 import src.hp_models as models 
 import xarray as xr 
+from scipy.ndimage import zoom
 
 plt.rcParams.update({
     'font.family': 'sans-serif',
@@ -418,11 +419,11 @@ def joint_dists_cr_pr(seasons, durations, surfaces, lifetime_mean=False):
                     model = m_pid.split('/')[1]
 
                     if season == 'all':
-                        cmap = 'Greens'
+                        cmap = 'viridis'
                     elif season == 'djf': 
-                        cmap = 'Blues'
+                        cmap = 'cividis'
                     elif season == 'jja': 
-                        cmap = 'YlOrRd'
+                        cmap = 'plasma'
 
                     shear_entr_ds = xr.open_dataset(f'/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data/{m_pid}/mcs_entrainment_wam.nc')
                     pe_ds = xr.open_zarr(f'/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data/{m_pid}/mcs_condensation_rate_wam_stats.zarr')
@@ -546,6 +547,167 @@ def joint_dists_cr_pr(seasons, durations, surfaces, lifetime_mean=False):
                 plt.subplots_adjust(wspace=0.3)
                 plt.savefig(f'figs/jointdist{output_addon}_cr_pr_MCScount_{season}_{surface}_duration-{duration}.png', bbox_inches = 'tight')
                 plt.close()
+
+
+
+def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
+    
+    for season in seasons: 
+        for duration in durations: 
+            for surface in surfaces: 
+                fig = plt.figure(figsize=(25, 10))
+                subfigs = fig.subfigures(2, 2)
+                for subfig, mname in zip(subfigs.flatten(), list(models_dict.keys())[2:]): 
+                    output_addon = ''
+                    ax_joint, ax_marg_x, ax_marg_y, cbar_ax = build_jointgrid_axes(subfig, cbar='True')
+
+                    m_pid = models_dict[mname]['path_id']
+                    model = m_pid.split('/')[1]
+
+                    if season == 'all':
+                        cmap = 'viridis'
+                    elif season == 'djf': 
+                        cmap = 'cividis'
+                    elif season == 'jja': 
+                        cmap = 'plasma'
+
+                    shear_entr_ds = xr.open_dataset(f'/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data/{m_pid}/mcs_entrainment_wam.nc')
+                    pe_ds = xr.open_zarr(f'/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data/{m_pid}/mcs_condensation_rate_wam_stats.zarr')
+
+                    track_nums = shear_entr_ds.tracks.values - 1 ### output (mask) idxs are offset by 1 from the true track idxs
+                    
+
+
+                    
+                    MASK_URL = models.mask_url(model)
+                    STATS_URL = models.stats_url(model)
+                    mask_ds  = xr.open_zarr(MASK_URL, chunks={}, mask_and_scale=False)
+                    dstracks = utils.load_track_stats(STATS_URL)
+                    dstracks_wam = dstracks.isel(tracks=track_nums)
+                    start_time = pd.DatetimeIndex(dstracks_wam.start_basetime.values)
+
+
+
+
+                    jja_mask = (start_time.month >= 6) & (start_time.month <= 8)
+                    djf_mask = (start_time.month <= 2) | (start_time.month == 12)
+
+
+
+                    ## filter season 
+                    if season == 'all': 
+                        dstracks_wam = dstracks_wam
+                        
+                    if season == 'jja': 
+                        season_mask = jja_mask
+                        dstracks_wam = dstracks_wam.isel(tracks=season_mask)
+                    elif season == 'djf': 
+                        season_mask = djf_mask
+                        dstracks_wam = dstracks_wam.isel(tracks=season_mask)
+
+                    
+                    track_durations = dstracks_wam.track_duration
+
+
+                    ## filter duration 
+                    if duration == 'all': 
+                        pass
+
+                    if duration == 'short': 
+                        dstracks_wam = dstracks_wam.isel(tracks=(track_durations < 10))
+
+                    elif duration == 'long': 
+                        dstracks_wam = dstracks_wam.isel(tracks=(track_durations >= 10))
+
+
+                    ## filter surface
+                    dstracks_wam = utils.filter_surface(dstracks_wam, surface) ## default is all 
+
+
+
+                    n_tracks = len(dstracks_wam.tracks)
+                    mask_tracks = dstracks_wam.tracks.values + 1  ## get rid of the previous offset
+
+                    shear_entr_ds = shear_entr_ds.sel(tracks=mask_tracks)
+                    pe_ds = pe_ds.sel(track=mask_tracks)
+
+                    # --- Raw (non-lifetime-mean) data ---
+                    cr_raw = (pe_ds.cr_mean * 3600).values
+                    pr_raw = (pe_ds.pr_mean * 3600).values
+                    pe_raw = pe_ds.pe_mean.values
+
+                    valid_raw = ~np.isnan(cr_raw) & ~np.isnan(pr_raw) & ~np.isnan(pe_raw)
+                    cr_raw, pr_raw, pe_raw = cr_raw[valid_raw], pr_raw[valid_raw], pe_raw[valid_raw]
+
+                    # --- Lifetime-mean data ---
+                    cr_lt = (pe_ds.cr_mean * 3600).mean(dim='times_3h', skipna=True).values
+                    pr_lt = (pe_ds.pr_mean * 3600).mean(dim='times_3h', skipna=True).values
+                    pe_lt = pe_ds.pe_mean.mean(dim='times_3h', skipna=True).values
+
+                    valid_lt = ~np.isnan(cr_lt) & ~np.isnan(pr_lt) & ~np.isnan(pe_lt)
+                    cr_lt, pr_lt, pe_lt = cr_lt[valid_lt], pr_lt[valid_lt], pe_lt[valid_lt]
+
+                    # --- Bin the raw data — this defines the shared grid (clip=True computes 5th-95th percentile edges) ---
+                    cr_edges, pr_edges, counts_raw = binned_stats(cr_raw, pr_raw, pe_raw, nx=20, statistic='count', clip=True)
+
+                    # --- Bin the lifetime-mean data onto the SAME edges (no separate clip, so grids stay aligned) ---
+                    counts_lt, _, _, _ = binned_statistic_2d(cr_lt, pr_lt, pe_lt, statistic='count', bins=[cr_edges, pr_edges])
+
+                    # --- Colored bins = raw data, as percentage of valid raw MCSs ---
+                    n_valid_raw = counts_raw.sum()
+                    percentages_raw = (counts_raw.T / n_valid_raw) * 100
+
+                    plot = ax_joint.pcolormesh(cr_edges, pr_edges, percentages_raw, cmap=cmap, vmin=0, vmax=1.5)
+                    fig.colorbar(plot, cax=cbar_ax, label=r'$\%$ MCSs')
+
+                    # --- Contour = lifetime-mean data, as percentage of valid lifetime-mean MCSs ---
+                    xcenters = (cr_edges[:-1] + cr_edges[1:]) / 2
+                    ycenters = (pr_edges[:-1] + pr_edges[1:]) / 2
+                    n_valid_lt = counts_lt.sum()
+                    percentages_lt = (counts_lt.T / n_valid_lt) * 100
+
+                    # Mask zero bins so they aren't traced as a contour level
+                    percentages_lt_masked = np.where(percentages_lt == 0, np.nan, percentages_lt)
+
+                    # Explicit levels, skipping the low end (avoids near-zero contour clutter)
+                    levels = np.linspace(np.nanpercentile(percentages_lt_masked, 10), np.nanmax(percentages_lt_masked), 3)
+
+                    # Upsample onto a finer grid via cubic interpolation for smoother-looking contours
+                    zoom_factor = 4
+                    percentages_lt_upsampled = zoom(np.nan_to_num(percentages_lt_masked), zoom=zoom_factor, order=3)
+
+                    xcenters_fine = np.linspace(xcenters.min(), xcenters.max(), percentages_lt_upsampled.shape[1])
+                    ycenters_fine = np.linspace(ycenters.min(), ycenters.max(), percentages_lt_upsampled.shape[0])
+
+                    contour_plot = ax_joint.contour(
+                        xcenters_fine, ycenters_fine, percentages_lt_upsampled,
+                        colors='red', levels=levels, linewidth=2
+                    )
+                    ax_joint.clabel(contour_plot, inline=True, fontsize=10)
+
+                    # --- Marginals (raw = black, lifetime-mean = red) ---
+                    sns.histplot(x=cr_raw, ax=ax_marg_x, color='black', stat='density', bins=20, kde=True)
+                    sns.histplot(y=pr_raw, ax=ax_marg_y, color='black', stat='density', bins=20, kde=True)
+                    sns.kdeplot(x=cr_lt, ax=ax_marg_x, color='red', linewidth=2)
+                    sns.kdeplot(y=pr_lt, ax=ax_marg_y, color='red', linewidth=2)  # fixed: was ax_marg_x
+
+                    # --- 1:1 reference line ---
+                    lims = [min(cr_raw.min(), pr_raw.min()), max(cr_raw.max(), pr_raw.max())]
+                    ax_joint.axline((lims[0], lims[0]), (lims[1], lims[1]), linestyle='--', color='black')
+
+                    ax_joint.set_xlabel(r'Condensation rate [mm hr$^{-1}$]')
+                    ax_joint.set_ylabel(r'Surface precipitation [mm hr$^{-1}$]')
+
+                    ax_joint.set_xlim(cr_edges.min(), cr_edges.max())
+                    ax_joint.set_ylim(pr_edges.min(), pr_edges.max())
+
+                    ax_marg_x.set_title(f'{mname.upper()} ' + r'n$_{tracks}$ = ' + f'{n_tracks}', pad=20)
+
+                plt.suptitle(f'SEASON: {season.upper()}; SURFACE: {surface.upper()}; DURATIONS: {duration.upper()}', y=1.1)
+                plt.subplots_adjust(wspace=0.3)
+                plt.savefig(f'figs/joint_dists/jointdist_overlay_cr_pr_MCScount_{season}_{surface}_duration-{duration}.png', bbox_inches = 'tight')
+                plt.close()
+
 
 def joint_dists_vars(seasons, durations, surfaces, vars=['cr', 'pr'], lifetime_mean=False):
     for season in seasons: 
@@ -859,4 +1021,6 @@ def plot_1h_norm_lifecycle():
 
 # joint_dists_tbdiff_shear(seasons, durations, surfaces) 
 
-joint_dists_cr_pr(seasons, durations, surfaces, lifetime_mean=True)
+# joint_dists_cr_pr(seasons, durations, surfaces, lifetime_mean=True) 
+
+joint_dists_cr_pr_plus_contour(seasons, durations, surfaces)
