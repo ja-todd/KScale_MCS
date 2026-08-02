@@ -203,7 +203,7 @@ def shear_tbdiff_PE_plot(seasons, durations, surfaces):
                     
                     ax.set_title(f'{mname.upper()} ' + r'n$_{tracks}$ = ' + f'{n_tracks}', pad=20)
 
-                axs[0].set_ylabel(r"T$_b$ diff [K]")
+                axs[0].set_ylabel(r"BT$_{diff}$  [K]")
                 plt.subplots_adjust(wspace=0.7)
                 fig.colorbar(plot, ax=axs, label='Precip Efficiency')
                 plt.suptitle(f'SEASON: {season.upper()}; SURFACE: {surface.upper()}; DURATIONS: {duration.upper()}', y=1.1)
@@ -333,7 +333,7 @@ def joint_dists_tbdiff_shear(seasons, durations, surfaces, lifetime_mean=False):
                     lims = [min(x.min(), y.min()), max(x.max(), y.max())]
                     ax_joint.axline((lims[0], lims[0]), (lims[1], lims[1]), linestyle='--', color='black')
                     ax_joint.set_xlabel(r'u600 - u850 [m s$^{-1}$]')
-                    ax_joint.set_ylabel(r'T$_b$diff')                    
+                    ax_joint.set_ylabel(r'BT$_{diff}$ [K]')                    
 
                     # g.ax_joint.set_xticks(np.arange(0, 6, 1))
                     # g.ax_joint.set_yticks(np.arange(0, 6, 1))
@@ -928,7 +928,7 @@ def shear_tbdiff_1Dhist():
                     bin_edges = np.linspace(-20, 21, 20)
                     ax.set_xlabel(r"Shear [m s$^{-1}$]")
                     plot_binned_line(x_axis, y_axis, bin_edges, color=color, label=mname.upper(), ax=ax)
-                    ax.set_ylabel(r"T$_b$ diff [K]")
+                    ax.set_ylabel(r"BT$_{diff}$  [K]")
                     ax.set_xlim(-20, 20)
                     ax.set_ylim(-40, 40)
                     ax.invert_yaxis()
@@ -954,10 +954,10 @@ def plot_1h_norm_lifecycle():
             ax1.plot(pe_ds[f'lifecycle_pctg_{duration}'], pe_ds[f'lifecycle_mean_tbdiff_{duration}'], color=color, linewidth=2.5, linestyle='--')
             ax.set_xlabel(r'$\%$ of Lifecycle')
             ax.set_ylabel('Precip Efficiency')
-            ax1.set_ylabel(r'T$_b$ diff [K]')
+            ax1.set_ylabel(r'BT$_{diff}$  [K]')
             ax.spines['right'].set_visible(True)
         ax.plot([], [], color='grey', alpha=0.4, linewidth=3, label='PE')    
-        ax.plot([], [], color='grey', alpha=0.4, linewidth=2.5, linestyle='--', label=r'T$_b$ diff')  
+        ax.plot([], [], color='grey', alpha=0.4, linewidth=2.5, linestyle='--', label=r'BT$_{diff}$ ')  
         ax.legend(bbox_to_anchor = (1.15, 1.3), ncols=3)
         
         plt.savefig(f'figs/z9_models_1h_norm_PE+tbdiff_lifecycle_durations-{duration}.png', bbox_inches='tight')
