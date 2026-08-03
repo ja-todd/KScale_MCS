@@ -129,8 +129,8 @@ def compute_track_PE(ds, model, region):
 
             ds_track = ds_t.isel(cell=track_mask)
 
-            cr_track = ds_track['condensation_rate'].compute().mean(dim='cell').values
-            pr_track = ds_track['precip_flux'].compute().mean(dim='cell').values
+            cr_track = ds_track['condensation_rate'].compute().sum(dim='cell').values
+            pr_track = ds_track['precip_flux'].compute().sum(dim='cell').values
 
             if cr_track == 0:
                 continue
