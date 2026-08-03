@@ -177,7 +177,7 @@ def shear_tbdiff_PE_plot(seasons, durations, surfaces):
 
 
                     pe_vals = pe_ds.pe_mean.values
-                    x_axis  = shear_entr_ds.shear_mean.values
+                    x_axis  = shear_entr_ds.shear_mean.values *-1
                     y_axis  = shear_entr_ds.tb_diff_mean.values
 
                     valid = ~np.isnan(pe_vals) & ~np.isnan(x_axis) & ~np.isnan(y_axis) & (pe_vals <=1)
@@ -299,7 +299,7 @@ def joint_dists_tbdiff_shear(seasons, durations, surfaces, lifetime_mean=False):
 
 
                     pe_vals = pe_ds.pe_mean
-                    x_axis  = shear_entr_ds.shear_mean
+                    x_axis  = shear_entr_ds.shear_mean * -1
                     y_axis  = shear_entr_ds.tb_diff_mean
 
                     if lifetime_mean: 
@@ -914,7 +914,7 @@ def shear_tbdiff_1Dhist():
 
 
                     pe_vals = pe_ds.pe_mean.values
-                    x_axis  = shear_entr_ds.shear_mean.values
+                    x_axis  = shear_entr_ds.shear_mean.values *-1
                     y_axis  = shear_entr_ds.tb_diff_mean.values
 
                     valid = ~np.isnan(pe_vals) & ~np.isnan(x_axis) & ~np.isnan(y_axis) & (pe_vals <=1)
