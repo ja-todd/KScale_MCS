@@ -4,6 +4,8 @@ import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from pathlib import Path
+import pickle
 import src.hp_models as models
 import warnings
 
@@ -258,3 +260,25 @@ def filter_surface(dstracks, surface):
     filtered = dstracks.isel(tracks=mask)
     print(f'  {int(mask.sum())} / {dstracks.sizes["tracks"]} tracks pass {surface} filter')
     return filtered
+
+def get_tracks_list(model_names, region_cfg): 
+
+    cache_path = Path('../data/tracks_list_cache.pkl')
+
+    if cache_path.exists():
+        with open(cache_path, 'rb') as f:
+            tracks_list = pickle.load(f)
+
+    else: 
+        tracks_list = []
+        for mname in model_names: 
+            m_id         = models.models_name_dict[mname]['path_id'].split('/')[1]
+            m_maskurl    = models.mask_url(m_id)
+            m_statsurl   = models.stats_url(m_id)
+            dstracks     = load_track_stats(m_statsurl)
+            dstracks_wam = filter_region_tracks(dstracks, region_cfg)
+            tracks_list.append(dstracks_wam)
+        with open(cache_path, 'wb') as f:
+            pickle.dump(tracks_list, f)
+
+    return tracks_list
