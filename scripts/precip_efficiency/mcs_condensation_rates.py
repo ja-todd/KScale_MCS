@@ -40,10 +40,6 @@ def init_zarr(dstracks_wam, model, region):
     n_tracks   = dstracks_wam.sizes['tracks']
     track_nums = dstracks_wam.tracks.values.astype(int)
 
-    cr_bins   = np.concatenate([[0], np.logspace(-6, -1, 100)])
-    pr_bins   = np.concatenate([[0], np.logspace(-6, -1, 100)])
-    n_cr_bins = len(cr_bins) - 1
-    n_pr_bins = len(pr_bins) - 1
 
     template = xr.Dataset({
         'cr_mean': xr.DataArray(
@@ -61,25 +57,23 @@ def init_zarr(dstracks_wam, model, region):
                      chunks=(100, MAX_TIMES_3H)),
             dims=['track', 'times_3h'],
             attrs={'units': 'dimensionless'}),
-        'cr_hist': xr.DataArray(
-            dsa.zeros((n_tracks, MAX_TIMES_3H, n_cr_bins), dtype=np.int32,
-                      chunks=(100, MAX_TIMES_3H, n_cr_bins)),
-            dims=['track', 'times_3h', 'cr_bin']),
-        'pr_hist': xr.DataArray(
-            dsa.zeros((n_tracks, MAX_TIMES_3H, n_pr_bins), dtype=np.int32,
-                      chunks=(100, MAX_TIMES_3H, n_pr_bins)),
-            dims=['track', 'times_3h', 'pr_bin']),
+        'cr_sum': xr.DataArray(
+            dsa.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32,
+                      chunks=(100, MAX_TIMES_3H)),
+            dims=['track', 'times_3h'],
+            attrs={'units': 'kg m-2 s-1'}),
+        'pr_sum': xr.DataArray(
+            dsa.zeros((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32,
+                      chunks=(100, MAX_TIMES_3H)),
+            dims=['track', 'times_3h'],
+            attrs={'units': 'kg m-2 s-1'}),
         'base_time': xr.DataArray(
             dsa.full((n_tracks, MAX_TIMES_3H), np.datetime64('NaT', 'ns'),
                      dtype='datetime64[ns]', chunks=(100, MAX_TIMES_3H)),
             dims=['track', 'times_3h']),
     },
     coords={
-        'track':        track_nums,
-        'cr_bin':       0.5 * (cr_bins[:-1] + cr_bins[1:]),
-        'pr_bin':       0.5 * (pr_bins[:-1] + pr_bins[1:]),
-        'cr_bin_edges': xr.DataArray(cr_bins, dims=['cr_bin_edge']),
-        'pr_bin_edges': xr.DataArray(pr_bins, dims=['pr_bin_edge']),
+        'track':        track_nums
     })
 
     zarr_path = models.data_dir(model, VAR) / f'mcs_condensation_rate_{region}_stats.zarr'
@@ -116,21 +110,15 @@ def compute_track_condensation_rates(cr_ds, precip_ds, mask_ds, dstracks_wam, wa
     first_3h_step = np.searchsorted(times_3h, start_times)
 
     n_tracks = len(track_nums)
-    dstracks_wam.track_duration.load()
-    durations = dstracks_wam.track_duration.values
 
     n_steps = len(times_3h)
 
-    cr_bins   = np.concatenate([[0], np.logspace(-6, -1, 100)])
-    pr_bins   = np.concatenate([[0], np.logspace(-6, -1, 100)])
-    n_cr_bins = len(cr_bins) - 1
-    n_pr_bins = len(pr_bins) - 1
 
-    cr_means      = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
-    pr_means      = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
-    pe_means      = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
-    cr_hists      = np.zeros((n_tracks, MAX_TIMES_3H, n_cr_bins), dtype=np.int32)
-    pr_hists      = np.zeros((n_tracks, MAX_TIMES_3H, n_pr_bins), dtype=np.int32)
+    cr_means       = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
+    pr_means       = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
+    pe_means       = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
+    cr_sums        = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
+    pr_sums        = np.full((n_tracks, MAX_TIMES_3H), np.nan, dtype=np.float32)
     base_time_out = np.full((n_tracks, MAX_TIMES_3H),
                              np.datetime64('NaT', 'ns'), dtype='datetime64[ns]')
 
@@ -162,30 +150,29 @@ def compute_track_condensation_rates(cr_ds, precip_ds, mask_ds, dstracks_wam, wa
             cr_mcs = cr_t[mcs_bool]
             pr_mcs = pr_t[mcs_bool]
 
+            cr_summed = cr_mcs.sum() ## eliminates issue of having lots of zeros (no condensation)
+            pr_summed = pr_mcs.sum()
+
             cr_mean = np.nanmean(cr_mcs)
             pr_mean = np.nanmean(pr_mcs)
 
             cr_means[out_i, li]      = cr_mean
             pr_means[out_i, li]      = pr_mean
-            pe_means[out_i, li]      = pr_mean / cr_mean if cr_mean > 0 else np.nan
-            cr_hists[out_i, li]      = np.histogram(cr_mcs, bins=cr_bins)[0]
-            pr_hists[out_i, li]      = np.histogram(pr_mcs, bins=pr_bins)[0]
+            pe_means[out_i, li]      = pr_summed / cr_summed if cr_summed > 0 else np.nan
+            cr_sums[out_i, li]       = cr_summed
+            pr_sums[out_i, li]       = pr_summed
             base_time_out[out_i, li] = t
 
     ds_out = xr.Dataset({
         'cr_mean':   xr.DataArray(cr_means,      dims=['track', 'times_3h'], attrs={'units': 'kg m-2 s-1'}),
         'pr_mean':   xr.DataArray(pr_means,      dims=['track', 'times_3h'], attrs={'units': 'kg m-2 s-1'}),
         'pe_mean':   xr.DataArray(pe_means,      dims=['track', 'times_3h']),
-        'cr_hist':   xr.DataArray(cr_hists,      dims=['track', 'times_3h', 'cr_bin']),
-        'pr_hist':   xr.DataArray(pr_hists,      dims=['track', 'times_3h', 'pr_bin']),
+        'cr_sum':   xr.DataArray(cr_sums,      dims=['track', 'times_3h'], attrs={'units': 'kg m-2 s-1'}),
+        'pr_sum':   xr.DataArray(pr_sums,      dims=['track', 'times_3h'], attrs={'units': 'kg m-2 s-1'}),
         'base_time': xr.DataArray(base_time_out, dims=['track', 'times_3h']),
     },
     coords={
-        'track':        track_nums,
-        'cr_bin':       0.5 * (cr_bins[:-1] + cr_bins[1:]),
-        'pr_bin':       0.5 * (pr_bins[:-1] + pr_bins[1:]),
-        'cr_bin_edges': xr.DataArray(cr_bins, dims=['cr_bin_edge']),
-        'pr_bin_edges': xr.DataArray(pr_bins, dims=['pr_bin_edge']),
+        'track':        track_nums
     })
 
     ds_out.to_zarr(zarr_path, mode = 'w')
@@ -223,12 +210,6 @@ def main():
     
     cr_idxs, mask_idxs, times_3h = align_times(cr_ds, mask_ds)
     precip_ds = precip_ds.sel(time=times_3h)
-
-
-    # if args.n_timesteps is not None:
-    #     cr_idxs = cr_idxs[:args.n_timesteps]
-    #     mask_idxs = mask_idxs[:args.n_timesteps]
-    #     times_3h  = times_3h[:args.n_timesteps]
 
     print(f'Creating zarr with {len(cr_idxs)} timesteps for '
           f'{dstracks_wam.sizes["tracks"]} WAM tracks...')
