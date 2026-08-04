@@ -27,8 +27,8 @@ p_utils.apply_plot_style()
 models_dict = models.models_name_dict
 BASE_PATH = '/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data'
 PE_BASE_PATH = '/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data'
-MNAMES = list(models_dict.keys())[2:]
-COLORS = [models_dict[mname]['color'] for mname in MNAMES]
+
+MNAMES, _, COLORS = p_utils.plot_var_setup(region='wam')
 
 
 durations = ['all', 'short', 'long']
@@ -507,7 +507,7 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
             for surface in surfaces: 
                 fig = plt.figure(figsize=(25, 10))
                 subfigs = fig.subfigures(2, 2)
-                for subfig, mname in zip(subfigs.flatten(), list(models_dict.keys())[2:]): 
+                for subfig, mname in zip(subfigs.flatten(), MNAMES): 
                     output_addon = ''
                     ax_joint, ax_marg_x, ax_marg_y, cbar_ax = build_jointgrid_axes(subfig, cbar='True')
 
@@ -544,7 +544,7 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
 
 
 
-                    ## filter season 
+                    ## filter season - this is quite badly written so should fix this
                     if season == 'all': 
                         dstracks_wam = dstracks_wam
                         

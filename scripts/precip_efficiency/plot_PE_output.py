@@ -2,6 +2,7 @@ import xarray as xr
 import numpy as np
 import src.hp_utils as utils 
 import src.hp_models as models 
+import src.plot_utils as p_utils
 import src.microphysics as micro 
 import matplotlib.pyplot as plt 
 from matplotlib.colors import LogNorm
@@ -12,53 +13,10 @@ from collections import defaultdict
 import matplotlib.patches as mpatches
 import cartopy.feature as cf
 
-plt.rcParams.update({
-    'font.family': 'sans-serif',
-    'font.sans-serif': ['Arial'],
-    'font.size': 15,
-    'axes.labelsize': 16,
-    'xtick.labelsize': 15,
-    'ytick.labelsize': 15,
-    'xtick.direction': 'out',
-    'ytick.direction': 'out',
-    'xtick.major.size': 6,
-    'ytick.major.size': 6,
-    'xtick.minor.size': 3,
-    'ytick.minor.size': 3,
-    'xtick.minor.visible': True,
-    'ytick.minor.visible': True,
-    'xtick.top': False,       # no top ticks (tmXTOn = False)
-    'ytick.right': False,
-    'ytick.left': True,     # no right ticks (tmYROn = False)
-    'axes.linewidth': 1.5,
-    'lines.linewidth': 2,
-    'axes.spines.top': False, 
-    'axes.spines.right': False,
-    'axes.facecolor':  "#EAEAF2E6",
-     
-    
-    'axes.grid': True, 
-    'grid.color': '#DEDFE4',
-    'grid.alpha': 0.5,
-    'figure.labelsize': '15', 
-    'font.weight': 'normal', 
-    'legend.handlelength': 2, 
-    'legend.handletextpad': 0.5, 
-    'legend.frameon': False, 
-})
 
+p_utils.apply_plot_style()
 
-models_dict = {
-    'RAL3_z10_40k' : {'path_id':'z10/um_glm_n2560_RAL3p3_tuned_sahel_z10_t40k', 'color': '#AC2078' },
-    'RAL3_z9' : {'path_id': 'z9/um_glm_n2560_RAL3p3_tuned_hk26', 'color': '#0D0C6E'},
-    'COMORPH_n2560_z9'     : {'path_id': 'z9/um_glm_n2560_CoMA9_hk26', 'color': '#BC6263'}, 
-    'COMORPH_n1280' : {'path_id': 'z9/um_glm_n1280_CoMA9_hk26', 'color':  '#B79394'},
-    'GAL9' : {'path_id': 'z9/um_glm_n1280_GAL9_v2_hk26', 'color':'#BBCBDF'},
-     
-    'RAL3_z10_4k' : {'path_id':'z10/um_glm_n2560_RAL3p3_tuned_sahel_z10_t4k', 'color': '#6893DA'}
-}
-
-
+models_dict = models.models_name_dict
 
 BASE_PATH = '/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data/'
 MNAMES = list(models_dict.keys())
@@ -67,7 +25,7 @@ COLORS = [models_dict[mname]['color'] for mname in MNAMES]
 
 
 
-def plot_mcs_stats_PE():
+def plot_mcs_durations():
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 
@@ -102,23 +60,9 @@ def plot_mcs_stats_PE():
     plt.subplots_adjust(wspace=0.3)
     plt.savefig('figs/mcs_counts_durations.pdf', bbox_inches = 'tight', dpi=300)
 
-    fig, ax = plt.subplots()
 
-    for mname, color in zip(MNAMES, COLORS): 
-        model_pid = models_dict[mname]['path_id']
-        PE_zarr = xr.open_zarr(f'{BASE_PATH}{model_pid}/mcs_precip_efficiency_wam.zarr')
-        storm_scale_PE = PE_zarr.precip_eff.groupby(PE_zarr.times_3h).mean(dim='tracks', skipna=True)
-        ax.plot(PE_zarr.times_3h.values * 3, storm_scale_PE.values,  color=color, label=mname)
 
-    ax.set_xlim(0, 60)
-    ax.set_ylim(0.2, 1)
-    ax.set_ylabel('Precip Efficiency')
-    ax.set_xlabel('Hours since storm initiation')
-    fig.legend(bbox_to_anchor = (1.1
-                                , 1.1), ncols=3)
-    ax.grid(color='white')
 
-    plt.savefig('figs/mcs_PE_since_initiation.pdf', bbox_inches = 'tight', dpi=300)
 
 
 """
