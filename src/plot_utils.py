@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt 
+import src.hp_models as models
 
 UNITS = {
     'shear': r'm s$^{-1}$', 
@@ -67,3 +68,14 @@ def match_colorbar_to_axes(fig, cbar, axs):
         y_max - y_min    # match full height of axes
     ])
 
+def plot_var_setup(region): 
+    """
+    Wrapper to make code to set variables for plotting
+    at the start of files shorter 
+    """
+    models_dict = models.models_name_dict
+    model_names = list(models_dict.keys())
+    region_cfg = models.REGIONS[f'{region}']
+    colors = [models.models_name_dict[mname]['color'] for mname in model_names]
+
+    return model_names, region_cfg, colors
