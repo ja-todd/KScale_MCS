@@ -1,7 +1,7 @@
 # KScale MCS - MSc Dissertation
 
 MSc dissertation work using global KScale simulations with the Met Office Unified Model, with various science configurations.
-Investigating shear-entrainment relationships in mesoscale convective systems over West Africa.
+Investigating shear-entrainment relationships in mesoscale convective systems over West Africa, and the relationship to precipitation efficiency.
 
 ## Structure
 
