@@ -23,48 +23,6 @@ MNAMES = list(models_dict.keys())
 COLORS = [models_dict[mname]['color'] for mname in MNAMES]
 
 
-
-
-def plot_mcs_durations():
-
-    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-
-    ax1, ax2 = axs.flatten()
-
-    for mname, color in zip(MNAMES, COLORS): 
-        model_pid = models_dict[mname]['path_id']
-        PE_zarr = xr.open_zarr(f'{BASE_PATH}{model_pid}/mcs_precip_efficiency_wam.zarr')
-        pe_valid = (~np.isnan(PE_zarr.precip_eff.values)).sum(axis=0) 
-        # print(pe_valid[hours > 60])
-        n_tracks = PE_zarr.sizes['tracks']
-        pe_valid_percentages = (pe_valid / n_tracks) * 100
-        # (times_3h,) - count per time slot
-        hours = np.arange(len(pe_valid)) * 3
-        ax1.plot(hours, pe_valid, color=color, label=mname)
-        ax2.plot(hours, pe_valid_percentages, color=color)
-
-
-    fig.legend(bbox_to_anchor = (0.85
-                                , 1.2), ncols=3)
-    for _ax in axs.flatten():
-        _ax.set_xlabel('Hours since storm initiation')
-        _ax.grid(color='white')
-
-    for _ax in [ax1, ax2]: 
-        _ax.set_xlim(0, 120)
-        _ax.set_yscale('log')
-
-    ax1.set_ylabel('Number of MCSs')
-    ax2.set_ylabel('Percentage of MCSs')
-
-    plt.subplots_adjust(wspace=0.3)
-    plt.savefig('figs/mcs_counts_durations.pdf', bbox_inches = 'tight', dpi=300)
-
-
-
-
-
-
 """
 MAKE HASH-MAP OF DSTRACKS FOR EACH OF THE MODELS TO MAKE THE PLOTTING QUICKER
 """

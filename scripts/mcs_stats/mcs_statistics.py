@@ -1,24 +1,21 @@
-import time
+from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+from pathlib import Path
+import cartopy.crs as ccrs
+import easygems.healpix as egh
+import matplotlib.pyplot as plt
+import numpy as np 
+import pandas as pd
+import pickle
 import src.hp_models as models 
 import src.hp_utils as utils
 import src.plot_utils as p_utils
-import numpy as np 
-import cartopy.crs as ccrs
-import matplotlib.pyplot as plt
-from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
-import pickle
-from pathlib import Path
-import pandas as pd
-import easygems.healpix as egh
+import time
+import xarray as xr
 
 
 p_utils.apply_plot_style()
 
-
-model_names = list(models.models_name_dict.keys())
-region_cfg = models.REGIONS['wam']
-COLORS = [models.models_name_dict[mname]['color'] for mname in model_names]
-
+MODEL_NAMES, REGION_CFG, COLORS = p_utils.plot_var_setup(region='wam')
 
 t0 = time.time()
 cache_path = Path('../../data/tracks_list_cache.pkl')
@@ -29,12 +26,12 @@ if cache_path.exists():
 
 else: 
     tracks_list = []
-    for mname in model_names: 
+    for mname in MODEL_NAMES: 
         m_id         = models.models_name_dict[mname]['path_id'].split('/')[1]
         m_maskurl    = models.mask_url(m_id)
         m_statsurl   = models.stats_url(m_id)
         dstracks     = utils.load_track_stats(m_statsurl)
-        dstracks_wam = utils.filter_region_tracks(dstracks, region_cfg)
+        dstracks_wam = utils.filter_region_tracks(dstracks, REGION_CFG)
         tracks_list.append(dstracks_wam)
     with open(cache_path, 'wb') as f:
         pickle.dump(tracks_list, f)
@@ -42,12 +39,15 @@ else:
 print(f"data processing: {time.time()-t0:.1f}s")
 
 
-def mcs_spatial_dist(): 
-
+def mcs_meanlat_spatial_dist(): 
+    """
+    Plots the percentage proportion of MCSs across the West African 
+    Sahel region by track mean lat over lifetime. 
+    """
     fig, axs = plt.subplots(2, 2, figsize=(15, 8),
                             subplot_kw={'projection': ccrs.PlateCarree()}, sharey=True, sharex=True)
 
-    for model_tracks, ax, name in zip(tracks_list, axs.flatten(), model_names):
+    for model_tracks, ax, name in zip(tracks_list, axs.flatten(), MODEL_NAMES):
 
         lats = model_tracks.meanlat.values  # (n_tracks, n_times)
         lons = model_tracks.meanlon.values
@@ -93,13 +93,104 @@ def mcs_spatial_dist():
     p_utils.match_colorbar_to_axes(fig, cbar, axs)
     plt.savefig('figs/MCS_spatial_dist.png', bbox_inches='tight')
 
+def mcs_track_density(): 
+    """
+    Plots the track density of MCSs across the West African 
+    Sahel region by track mean lat over lifetime, for each of the four models. 
+    """
+    fig, axs = plt.subplots(2, 2, figsize=(15, 8),
+                            subplot_kw={'projection': ccrs.PlateCarree()}, sharey=True, sharex=True)
+
+    for model_tracks, ax, name in zip(tracks_list, axs.flatten(), MODEL_NAMES):
+
+        lats = model_tracks.meanlat.values  # (n_tracks, n_times)
+        lons = model_tracks.meanlon.values
+        lons = (lons + 180) % 360 - 180
+
+
+        # use all timesteps instead of mean position
+        lats_flat = lats.ravel()
+        lons_flat = lons.ravel()
+
+        valid = ~np.isnan(lats_flat) & ~np.isnan(lons_flat)
+        lats_flat = lats_flat[valid]
+        lons_flat = lons_flat[valid]
+
+        density, _, _ = np.histogram2d(lats_flat, lons_flat,
+                                        bins=[lat_bins, lon_bins])
+
+        density_pct = (density / density.sum()) * 100
+
+    
+        lon_bins = np.arange(-20, 41, 2.5)
+        lat_bins = np.arange(0, 21, 2.5)
+
+        lon_centres = (lon_bins[:-1] + lon_bins[1:]) / 2
+        lat_centres = (lat_bins[:-1] + lat_bins[1:]) / 2
+
+        ax.coastlines()
+        ax.set_extent([-20, 40, 0, 20])
+        ax.set_xticks(np.arange(-20, 41, 10), crs=ccrs.PlateCarree())
+        ax.set_yticks(np.arange(0, 21, 5), crs=ccrs.PlateCarree())
+        ax.xaxis.set_major_formatter(LongitudeFormatter())
+        ax.yaxis.set_major_formatter(LatitudeFormatter())
+        im = ax.pcolormesh(lon_centres, lat_centres, density_pct,
+                            vmin=0, vmax=3, cmap='bone_r')
+        ax.set_title(f'{name}, n = {model_tracks.sizes["tracks"]}')
+
+    axs = axs.flatten()
+
+    axs[1].yaxis.set_tick_params(labelleft=False)   # top right - no left labels
+    axs[1].xaxis.set_tick_params(labelbottom=False) # bottom left - no bottom labels
+    axs[3].yaxis.set_tick_params(labelleft=False)   # bottom right - no left labels
+
+    cbar_ax = fig.add_axes([0.9, 0.1, 0.02, 0.8])  # placeholder, will be resized
+    cbar = fig.colorbar(im, cax=cbar_ax, label='Proportion of MCSs [%]')
+    p_utils.match_colorbar_to_axes(fig, cbar, axs)
+    plt.savefig('figs/MCS_track_density.png', bbox_inches='tight')
+
+
+def plot_mcs_durations():
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+
+    ax1, ax2 = axs.flatten()
+
+    for mname, color in zip(MODEL_NAMES, COLORS): 
+        model_pid = models_dict[mname]['path_id']
+        PE_zarr = xr.open_zarr(f'{BASE_PATH}{model_pid}/mcs_precip_efficiency_wam.zarr')
+        pe_valid = (~np.isnan(PE_zarr.precip_eff.values)).sum(axis=0) 
+        # print(pe_valid[hours > 60])
+        n_tracks = PE_zarr.sizes['tracks']
+        pe_valid_percentages = (pe_valid / n_tracks) * 100
+        # (times_3h,) - count per time slot
+        hours = np.arange(len(pe_valid)) * 3
+        ax1.plot(hours, pe_valid, color=color, label=mname)
+        ax2.plot(hours, pe_valid_percentages, color=color)
+
+
+    fig.legend(bbox_to_anchor = (0.85
+                                , 1.2), ncols=3)
+    for _ax in axs.flatten():
+        _ax.set_xlabel('MCS track duration')
+        _ax.grid(color='white')
+
+    for _ax in [ax1, ax2]: 
+        _ax.set_xlim(0, 120)
+        _ax.set_yscale('log')
+
+    ax1.set_ylabel('Number of MCSs')
+    ax2.set_ylabel('Percentage of MCSs')
+
+    plt.subplots_adjust(wspace=0.3)
+    plt.savefig('figs/mcs_counts_durations.pdf', bbox_inches = 'tight', dpi=300)
 
 
 
 def init_time_map():
     fig, axs = plt.subplots(2, 2, figsize=(15, 8),
                          subplot_kw={'projection': ccrs.PlateCarree()}, sharey=True, sharex=True)
-    for model_tracks, ax, name in zip(tracks_list, axs.flatten(), model_names):
+    for model_tracks, ax, name in zip(tracks_list, axs.flatten(), MODEL_NAMES):
 
         lats = model_tracks.meanlat.values
         lons = model_tracks.meanlon.values
@@ -157,7 +248,7 @@ def temp_gradient():
         fig, axs = plt.subplots(2, 2, figsize=(15, 8),
                                     subplot_kw={'projection': ccrs.PlateCarree()}, sharey=True, sharex=True)
         
-        for model_tracks, color, name, ax in zip(tracks_list, COLORS, model_names, axs.flatten()): 
+        for model_tracks, color, name, ax in zip(tracks_list, COLORS, MODEL_NAMES, axs.flatten()): 
             ds_name = models.models_name_dict[name]['path_id'].split('/')[1]  ## name used to access the catalog
             
             start_times = model_tracks.start_basetime.values
@@ -180,7 +271,7 @@ def temp_gradient():
                 )
             select_start_times = pd.DatetimeIndex(adjusted).normalize() + pd.Timedelta(12, unit='hours')
 
-            ds3h = utils.open_region_dataset(ds_name, region_cfg)
+            ds3h = utils.open_region_dataset(ds_name, REGION_CFG)
             ds_pre_MCS = ds3h.sel(time=select_start_times)
             pre_MCS_temp = ds_pre_MCS.ta.sel(pressure=1000).mean(dim='time')
             pre_MCS_shear = (ds_pre_MCS.ua.sel(pressure=600) - ds_pre_MCS.ua.sel(pressure=850)).mean(dim='time')
@@ -211,7 +302,7 @@ def init_time_dists():
     t0 = time.time()
     fig, ax = plt.subplots()
 
-    for model_tracks, color, name in zip(tracks_list, COLORS, model_names):
+    for model_tracks, color, name in zip(tracks_list, COLORS, MODEL_NAMES):
         start_times = model_tracks.start_basetime.values
         init_hours  = pd.DatetimeIndex(start_times).hour.astype(float)
         valid       = ~np.isnan(init_hours)
@@ -238,4 +329,8 @@ def init_time_dists():
 
 # init_time_dists() 
 
-temp_gradient()
+# temp_gradient()
+
+
+mcs_meanlat_spatial_dist()
+mcs_track_density()
