@@ -19,36 +19,15 @@ with warnings.catch_warnings():
 BASE_PATH = '/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data/'
 
 models_dict = models.models_name_dict
-model_names = list(models.models_name_dict.keys())
-region_cfg = models.REGIONS['wam']
-colors = [models.models_name_dict[mname]['color'] for mname in model_names]
+MODEL_NAMES, REGION_CFG, COLORS = p_utils.plot_var_setup()
 
 
 p_utils.apply_plot_style()
 
 
+tracks_list = utils.get_tracks_list()
 
-
-t0 = time.time()
-cache_path = Path('../../data/tracks_list_cache.pkl')
-
-if cache_path.exists():
-    with open(cache_path, 'rb') as f:
-        tracks_list = pickle.load(f)
-
-else: 
-    tracks_list = []
-    for mname in model_names: 
-        m_id         = models.models_name_dict[mname]['path_id'].split('/')[1]
-        m_maskurl    = models.mask_url(m_id)
-        m_statsurl   = models.stats_url(m_id)
-        dstracks     = utils.load_track_stats(m_statsurl)
-        dstracks_wam = utils.filter_region_tracks(dstracks, region_cfg)
-        tracks_list.append(dstracks_wam)
-    with open(cache_path, 'wb') as f:
-        pickle.dump(tracks_list, f)
-
-print(f"data processing: {time.time()-t0:.1f}s")
+    
 
 
 
@@ -57,7 +36,7 @@ def _plot_lifecycle_mean_cr(n_bins=20):
     fig, ax = plt.subplots()
     ax1 = ax.twinx()
 
-    for mname, color, model_tracks in zip(model_names, colors, tracks_list): 
+    for mname, color, model_tracks in zip(MODEL_NAMES, COLORS, tracks_list): 
         model_pid = models_dict[mname]['path_id']
         
         dstracks = model_tracks
@@ -120,15 +99,11 @@ def _plot_lifecycle_mean_cr(n_bins=20):
     plt.close()
 
 
-
-
-
-
 def _plot_cr_lifecycle_contribution(n_bins=20): 
     fig, ax = plt.subplots()
     # ax1 = ax.twinx()
 
-    for mname, color, model_tracks in zip(model_names, colors, tracks_list): 
+    for mname, color, model_tracks in zip(MODEL_NAMES, COLORS, tracks_list): 
     
         model_pid = models_dict[mname]['path_id']
             
@@ -189,6 +164,9 @@ def _plot_cr_lifecycle_contribution(n_bins=20):
 
 
 ########## 
+## RUN FILES
+##########
+
 _plot_lifecycle_mean_cr(n_bins=10)
 _plot_cr_lifecycle_contribution(n_bins=10)
 
