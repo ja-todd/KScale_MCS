@@ -82,6 +82,8 @@ def _1h_lifecycle(input_zarr, entr_ds, times_3h, dstracks_wam, model, region):
 
     surface_filters = ['all', 'land', 'ocean']
 
+    ds_lifecycle = xr.Dataset()
+
     for season_label, season_mask in season_filters.items(): 
 
         print(f"processing season={season_label} tracks ...")
@@ -117,7 +119,7 @@ def _1h_lifecycle(input_zarr, entr_ds, times_3h, dstracks_wam, model, region):
 
             }
 
-            ds_lifecycle = xr.Dataset()
+            
 
             n_steps = len(times_3h)
 
