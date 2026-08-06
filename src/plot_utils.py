@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt 
 import src.hp_models as models
+import numpy as np
 
 UNITS = {
     'shear': r'm s$^{-1}$', 
@@ -48,7 +49,10 @@ def apply_plot_style():
         'font.weight': 'normal', 
         'legend.handlelength': 2, 
         'legend.handletextpad': 0.5, 
-        'legend.frameon': False, 
+        'legend.frameon': False,
+        'savefig.format': 'pdf', 
+        'savefig.dpi': 300, 
+        'savefig.bbox': 'tight'
     })
 
 def match_colorbar_to_axes(fig, cbar, axs):
@@ -68,7 +72,7 @@ def match_colorbar_to_axes(fig, cbar, axs):
         y_max - y_min    # match full height of axes
     ])
 
-def plot_var_setup(region): 
+def plot_var_setup(region='wam'): 
     """
     Wrapper to make code to set variables for plotting
     at the start of files shorter 
@@ -79,3 +83,53 @@ def plot_var_setup(region):
     colors = [models.models_name_dict[mname]['color'] for mname in model_names]
 
     return model_names, region_cfg, colors
+
+def label_subplots(axs, x_offset=-0.1, y_offset=1.02):
+    """
+    Labels subplots with a), b), c) etc. positioned outside the top left of each axis.
+    
+    axs: 2D or 1D array of axes (e.g. from plt.subplots)
+    x_offset: horizontal position relative to axes (negative = to the left)
+    y_offset: vertical position relative to axes (>1 = above)
+    """
+    axs_flat = np.array(axs).flatten()
+    fontsize = plt.rcParams['axes.titlesize']
+    
+    for i, ax in enumerate(axs_flat):
+        label = f'{chr(97 + i)})'  # a), b), c) ...
+        ax.text(x_offset, y_offset, label,
+                transform=ax.transAxes,
+                fontweight='bold',
+                fontsize=fontsize,
+                ha='left',
+                va='bottom')
+
+
+def centre_legend_above(fig, axs, ncols=4, y_offset=1.02, **legend_kwargs):
+    """
+    Places a figure legend centred above all subplots.
+    
+    fig: matplotlib figure
+    axs: array of axes
+    ncols: number of legend columns
+    y_offset: vertical position in figure coordinates (>1 = above axes)
+    **legend_kwargs: passed to fig.legend
+    """
+    fig.canvas.draw()
+    
+    axs_flat = np.array(axs).flatten()
+    
+    x_left   = min(ax.get_position().x0 for ax in axs_flat)
+    x_right  = max(ax.get_position().x1 for ax in axs_flat)
+    y_top    = max(ax.get_position().y1 for ax in axs_flat)
+    x_centre = (x_left + x_right) / 2
+    
+    legend = fig.legend(
+        loc='lower center',
+        bbox_to_anchor=(x_centre, y_top + (y_offset - 1)),
+        ncols=ncols,
+        frameon=False,
+        **legend_kwargs
+    )
+    
+    return legend
