@@ -261,9 +261,8 @@ def filter_surface(dstracks, surface):
     print(f'  {int(mask.sum())} / {dstracks.sizes["tracks"]} tracks pass {surface} filter')
     return filtered
 
-def get_tracks_list(model_names, region_cfg): 
+def get_tracks_list(model_names, region_cfg, cache_path): 
 
-    cache_path = Path('../data/tracks_list_cache.pkl')
 
     if cache_path.exists():
         with open(cache_path, 'rb') as f:
