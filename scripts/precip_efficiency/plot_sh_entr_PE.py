@@ -25,7 +25,7 @@ p_utils.apply_plot_style()
 
 
 models_dict = models.models_name_dict
-BASE_PATH = '/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data'
+ENTR_BASE_PATH = '/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data'
 PE_BASE_PATH = '/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data'
 
 MNAMES, _, COLORS = p_utils.plot_var_setup(region='wam')
@@ -34,7 +34,6 @@ MNAMES, _, COLORS = p_utils.plot_var_setup(region='wam')
 durations = ['all', 'short', 'long']
 seasons = ['all', 'jja', 'djf']
 surfaces = ['all', 'land', 'ocean']
-
 
 
 def binned_stats(x_axis, y_axis, vals, nx=20, statistic='mean', clip=False):
@@ -208,7 +207,7 @@ def shear_tbdiff_PE_plot(seasons, durations, surfaces):
                 fig.colorbar(plot, ax=axs, label='Precip Efficiency')
                 plt.suptitle(f'SEASON: {season.upper()}; SURFACE: {surface.upper()}; DURATIONS: {duration.upper()}', y=1.1)
                 
-                plt.savefig(f'figs/2Dhist_shear_tbdiff_PE_{season}_{surface}_duration-{duration}.png', bbox_inches = 'tight')
+                plt.savefig(f'figs/2Dhist_shear_tbdiff_PE_{season}_{surface}_duration-{duration}')
                 plt.close()
 
 
@@ -348,7 +347,7 @@ def joint_dists_tbdiff_shear(seasons, durations, surfaces, lifetime_mean=False):
 
                 plt.suptitle(f'SEASON: {season.upper()}; SURFACE: {surface.upper()}; DURATIONS: {duration.upper()}', y=1.1)
                 
-                plt.savefig(f'figs/jointdist_shear_tbdiff_MCScount_{season}_{surface}_duration-{duration}.png', bbox_inches = 'tight')
+                plt.savefig(f'figs/jointdist_shear_tbdiff_MCScount_{season}_{surface}_duration-{duration}')
                 plt.close()
                 
 
@@ -495,18 +494,22 @@ def joint_dists_cr_pr(seasons, durations, surfaces, lifetime_mean=False):
 
                 plt.suptitle(f'SEASON: {season.upper()}; SURFACE: {surface.upper()}; DURATIONS: {duration.upper()}', y=1.1)
                 plt.subplots_adjust(wspace=0.3)
-                plt.savefig(f'figs/jointdist{output_addon}_cr_pr_MCScount_{season}_{surface}_duration-{duration}.png', bbox_inches = 'tight')
+                plt.savefig(f'figs/jointdist{output_addon}_cr_pr_MCScount_{season}_{surface}_duration-{duration}')
                 plt.close()
 
 
 
-def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
-    
+def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces, summed=False):
+    if summed: 
+        tag = 'summed'
+    else: 
+        tag = 'mean'
     for season in seasons: 
         for duration in durations: 
             for surface in surfaces: 
                 fig = plt.figure(figsize=(25, 10))
                 subfigs = fig.subfigures(2, 2)
+                
                 for subfig, mname in zip(subfigs.flatten(), MNAMES): 
                     output_addon = ''
                     ax_joint, ax_marg_x, ax_marg_y, cbar_ax = build_jointgrid_axes(subfig, cbar='True')
@@ -521,8 +524,8 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
                     elif season == 'jja': 
                         cmap = 'plasma'
 
-                    shear_entr_ds = xr.open_dataset(f'/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data/{m_pid}/mcs_entrainment_wam.nc')
-                    pe_ds = xr.open_zarr(f'/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data/{m_pid}/mcs_condensation_rate_wam_stats.zarr')
+                    shear_entr_ds = xr.open_dataset(f'{ENTR_BASE_PATH}/{m_pid}/mcs_entrainment_wam.nc')
+                    pe_ds = xr.open_zarr(f'{PE_BASE_PATH}/{m_pid}/mcs_condensation_rate_wam_stats.zarr')
 
                     track_nums = shear_entr_ds.tracks.values - 1 ### output (mask) idxs are offset by 1 from the true track idxs
                     
@@ -582,17 +585,33 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
                     pe_ds = pe_ds.sel(track=mask_tracks)
 
                     # non-lifetime-mean 
-                    cr_raw = (pe_ds.cr_mean * 3600).values
-                    pr_raw = (pe_ds.pr_mean * 3600).values
-                    pe_raw = pe_ds.pe_mean.values
+
+                    if not summed: 
+                        cr_raw = (pe_ds.cr_mean * 3600).values
+                        pr_raw = (pe_ds.pr_mean * 3600).values
+                        pe_raw = pe_ds.pe_mean.values
+
+                    if summed: 
+                        cr_raw = (pe_ds.cr_sum).values
+                        pr_raw = (pe_ds.pr_sum).values
+                        pe_raw = pe_ds.pe_mean.values
+
 
                     valid_raw = ~np.isnan(cr_raw) & ~np.isnan(pr_raw) & ~np.isnan(pe_raw)
                     cr_raw, pr_raw, pe_raw = cr_raw[valid_raw], pr_raw[valid_raw], pe_raw[valid_raw]
 
                     # lifetime-mean
-                    cr_lt = (pe_ds.cr_mean * 3600).mean(dim='times_3h', skipna=True).values
-                    pr_lt = (pe_ds.pr_mean * 3600).mean(dim='times_3h', skipna=True).values
-                    pe_lt = pe_ds.pe_mean.mean(dim='times_3h', skipna=True).values
+
+                    if not summed: 
+
+                        cr_lt = (pe_ds.cr_mean * 3600).mean(dim='times_3h', skipna=True).values
+                        pr_lt = (pe_ds.pr_mean * 3600).mean(dim='times_3h', skipna=True).values
+                        pe_lt = pe_ds.pe_mean.mean(dim='times_3h', skipna=True).values
+
+                    if summed: 
+                        cr_lt = (pe_ds.cr_sum).mean(dim='times_3h', skipna=True).values
+                        pr_lt = (pe_ds.pr_sum).mean(dim='times_3h', skipna=True).values
+                        pe_lt = pe_ds.pe_mean.mean(dim='times_3h', skipna=True).values
 
                     valid_lt = ~np.isnan(cr_lt) & ~np.isnan(pr_lt) & ~np.isnan(pe_lt)
                     cr_lt, pr_lt, pe_lt = cr_lt[valid_lt], pr_lt[valid_lt], pe_lt[valid_lt]
@@ -620,8 +639,8 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
                     percentages_lt_masked = np.where(percentages_lt == 0, np.nan, percentages_lt)
 
                     # set the contour levels
-                    levels = np.linspace(np.nanpercentile(percentages_lt_masked, 10), np.nanmax(percentages_lt_masked), 3)
-
+                    # levels = np.linspace(np.nanpercentile(percentages_lt_masked, 10), np.nanmax(percentages_lt_masked), 3)
+                    levels = [0.5, 1.5]
                     # smooth contours
                     zoom_factor = 4
                     percentages_lt_upsampled = zoom(np.nan_to_num(percentages_lt_masked), zoom=zoom_factor, order=3)
@@ -633,7 +652,7 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
                         xcenters_fine, ycenters_fine, percentages_lt_upsampled,
                         colors='red', levels=levels, linewidths=2.5
                     )
-                    ax_joint.clabel(contour_plot, inline=True, fontsize=10)
+                    ax_joint.clabel(contour_plot, inline=True, fontsize=15)
 
                     # marginal plots
                     sns.histplot(x=cr_raw, ax=ax_marg_x, color='black', stat='density', bins=20, kde=True)
@@ -645,44 +664,181 @@ def joint_dists_cr_pr_plus_contour(seasons, durations, surfaces):
                     lims = [min(cr_raw.min(), pr_raw.min()), max(cr_raw.max(), pr_raw.max())]
                     ax_joint.axline((lims[0], lims[0]), (lims[1], lims[1]), linestyle='--', color='black')
 
-                    ax_joint.set_xlabel(r'Condensation rate [mm hr$^{-1}$]')
-                    ax_joint.set_ylabel(r'Surface precipitation [mm hr$^{-1}$]')
+
+                    if not summed: 
+                        ax_joint.set_xlabel(r'Condensation rate [mm hr$^{-1}$]')
+                        ax_joint.set_ylabel(r'Surface precipitation [mm hr$^{-1}$]')
+
+                    if summed: 
+                        ax_joint.set_xlabel(r'Condensation rate [kg m$^{-2}$ s$^{-1}$]')
+                        ax_joint.set_ylabel(r'Precipitation rate [kg m$^{-2}$ s$^{-1}$]')
+
 
                     ax_joint.set_xlim(cr_edges.min(), cr_edges.max())
                     ax_joint.set_ylim(pr_edges.min(), pr_edges.max())
 
-                    ax_marg_x.set_title(f'{mname.upper()} ' + r'n$_{tracks}$ = ' + f'{n_tracks}', pad=20)
+                    ax_marg_x.set_title(f'{mname} ' + r'n$_{tracks}$ = ' + f'{n_tracks}', pad=20)
 
-                plt.suptitle(f'SEASON: {season.upper()}; SURFACE: {surface.upper()}; DURATIONS: {duration.upper()}', y=1.1)
                 plt.subplots_adjust(wspace=0.3)
-                plt.savefig(f'figs/joint_dists/jointdist_overlay_cr_pr_MCScount_{season}_{surface}_duration-{duration}.png', bbox_inches = 'tight')
+                axes_list = [subfig.get_axes()[0] for subfig in subfigs.flatten()]
+                p_utils.label_subplots(axes_list)
+                plt.suptitle(f'SEASON: {season.upper()}; SURFACE: {surface.upper()}; DURATIONS: {duration.upper()}', y=1.1)
+                plt.savefig(f'figs/joint_dists/{tag}_cr_pr_MCScount_{season}_{surface}_duration-{duration}')
                 plt.close()
 
 
-def joint_dists_vars(seasons, durations, surfaces, vars=['cr', 'pr'], lifetime_mean=False):
+
+def shear_tbdiff_PE_scatter(): 
+    """not cr"""
+    for season in seasons: 
+            for duration in durations: 
+                for surface in surfaces: 
+                    fig = plt.figure(figsize=(25, 10))
+                    subfigs = fig.subfigures(2, 2, wspace=-0.25, hspace=0.15)
+                    
+                    for subfig, mname in zip(subfigs.flatten(), MNAMES): 
+                       
+                        ax = subfig.add_subplot(111)
+    
+                        m_pid = models_dict[mname]['path_id']
+                        model = m_pid.split('/')[1]
+    
+                        if season == 'all':
+                            cmap = 'viridis'
+                        elif season == 'djf': 
+                            cmap = 'cividis'
+                        elif season == 'jja': 
+                            cmap = 'plasma'
+    
+                        shear_entr_ds = xr.open_dataset(f'{ENTR_BASE_PATH}/{m_pid}/mcs_entrainment_wam.nc')
+                        pe_ds = xr.open_zarr(f'{PE_BASE_PATH}/{m_pid}/mcs_condensation_rate_wam_stats.zarr')
+    
+                        track_nums = shear_entr_ds.tracks.values - 1 ### output (mask) idxs are offset by 1 from the true track idxs
+                        
+    
+    
+                        
+                        MASK_URL = models.mask_url(model)
+                        STATS_URL = models.stats_url(model)
+                        mask_ds  = xr.open_zarr(MASK_URL, chunks={}, mask_and_scale=False)
+                        dstracks = utils.load_track_stats(STATS_URL)
+                        dstracks_wam = dstracks.isel(tracks=track_nums)
+                        start_time = pd.DatetimeIndex(dstracks_wam.start_basetime.values)
+    
+    
+    
+    
+                        jja_mask = (start_time.month >= 6) & (start_time.month <= 8)
+                        djf_mask = (start_time.month <= 2) | (start_time.month == 12)
+    
+    
+    
+                        ## filter season - this is quite badly written so should fix this
+                        if season == 'all': 
+                            dstracks_wam = dstracks_wam
+                            
+                        if season == 'jja': 
+                            season_mask = jja_mask
+                            dstracks_wam = dstracks_wam.isel(tracks=season_mask)
+                        elif season == 'djf': 
+                            season_mask = djf_mask
+                            dstracks_wam = dstracks_wam.isel(tracks=season_mask)
+    
+                        
+                        track_durations = dstracks_wam.track_duration
+    
+    
+                        ## filter duration 
+                        if duration == 'all': 
+                            pass
+    
+                        if duration == 'short': 
+                            dstracks_wam = dstracks_wam.isel(tracks=(track_durations < 10))
+    
+                        elif duration == 'long': 
+                            dstracks_wam = dstracks_wam.isel(tracks=(track_durations >= 10))
+    
+    
+                        ## filter surface
+                        dstracks_wam = utils.filter_surface(dstracks_wam, surface) ## default is all 
+    
+    
+    
+                        n_tracks = len(dstracks_wam.tracks)
+                        mask_tracks = dstracks_wam.tracks.values + 1  ## get rid of the previous offset
+    
+                        shear_entr_ds = shear_entr_ds.sel(tracks=mask_tracks)
+                        pe_ds = pe_ds.sel(track=mask_tracks)
+    
+                        pe_vals = pe_ds.pe_mean.values
+                        mean_shear  = shear_entr_ds.shear_mean.values *-1
+                        mean_tbdiff  = shear_entr_ds.tb_diff_mean.values
+    
+                        valid = ~np.isnan(pe_vals) & ~np.isnan(mean_shear) & ~np.isnan(mean_tbdiff)
+    
+                        pe_vals = pe_vals[valid]
+                        mean_shear  = mean_shear[valid]
+                        mean_tbdiff  = mean_tbdiff[valid]
+
+                        scatter = ax.scatter(
+                            mean_shear, mean_tbdiff, 
+                            c=pe_vals, 
+                            cmap=cmap,
+                            vmin=0, vmax=1,
+                            s=4
+                        )
+                        subfig.colorbar(scatter, ax=ax, label='PE')
+                        # marginal plots
+                        
+                    
+                        # 1:1 line
+                        lims = [min(mean_shear.min(), mean_tbdiff.min()), max(mean_shear.max(), mean_tbdiff.max())]
+                        ax.axline((lims[0], lims[0]), (lims[1], lims[1]), linestyle='--', color='black')
+    
+                        ax.set_xlabel(r"Shear [m s$^{-1}$]")
+                        ax.set_ylabel(r"BT$_{diff}$  [K]")
+                        ax.set_xlim(-20, 20)
+                        ax.set_ylim(-40, 40)
+    
+                        ax.set_title(f'{mname} ' + r'n$_{tracks}$ = ' + f'{n_tracks}', pad=20)
+    
+                    plt.suptitle(f'SEASON: {season.upper()}; SURFACE: {surface.upper()}; DURATIONS: {duration.upper()}', y=1.1)
+                    axes_list = [subfig.get_axes()[0] for subfig in subfigs.flatten()]
+                    p_utils.label_subplots(axes_list)
+                    plt.savefig(f'figs/scatters/shear_tbdiff_PE_{season}_{surface}_duration-{duration}')
+                    plt.close()
+
+
+
+
+
+
+
+
+def scatter_cr_pr_PE(seasons, durations, surfaces):
+    
     for season in seasons: 
         for duration in durations: 
             for surface in surfaces: 
                 fig = plt.figure(figsize=(25, 10))
-                subfigs = fig.subfigures(2, 2)
-                for subfig, mname in zip(subfigs.flatten(), list(models_dict.keys())[:4]): 
-                    output_addon = ''
-                    ax_joint, ax_marg_x, ax_marg_y, cbar_ax = build_jointgrid_axes(subfig, cbar='True')
+                subfigs = fig.subfigures(2, 2, wspace=-0.1, hspace=0.15)
+                
+                for subfig, mname in zip(subfigs.flatten(), MNAMES): 
+                   
+                    ax = subfig.add_subplot(111)
 
                     m_pid = models_dict[mname]['path_id']
                     model = m_pid.split('/')[1]
 
                     if season == 'all':
-                        cmap = 'Greens'
+                        cmap = 'viridis'
                     elif season == 'djf': 
-                        cmap = 'Blues'
+                        cmap = 'cividis'
                     elif season == 'jja': 
-                        cmap = 'YlOrRd'
+                        cmap = 'plasma'
 
-                    
-
-                    shear_entr_ds = xr.open_dataset(f'/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data/{m_pid}/mcs_entrainment_wam.nc')
-                    pe_ds = xr.open_zarr(f'/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data/{m_pid}/mcs_condensation_rate_wam_stats.zarr')
+                    shear_entr_ds = xr.open_dataset(f'{ENTR_BASE_PATH}/{m_pid}/mcs_entrainment_wam.nc')
+                    pe_ds = xr.open_zarr(f'{PE_BASE_PATH}/{m_pid}/mcs_condensation_rate_wam_stats.zarr')
 
                     track_nums = shear_entr_ds.tracks.values - 1 ### output (mask) idxs are offset by 1 from the true track idxs
                     
@@ -704,7 +860,7 @@ def joint_dists_vars(seasons, durations, surfaces, vars=['cr', 'pr'], lifetime_m
 
 
 
-                    ## filter season 
+                    ## filter season - this is quite badly written so should fix this
                     if season == 'all': 
                         dstracks_wam = dstracks_wam
                         
@@ -736,231 +892,173 @@ def joint_dists_vars(seasons, durations, surfaces, vars=['cr', 'pr'], lifetime_m
 
 
                     n_tracks = len(dstracks_wam.tracks)
-                    mask_tracks = dstracks_wam.tracks.values + 1  ## get rid of the previous offset (probably not the right way of doing it but alright)
-
+                    mask_tracks = dstracks_wam.tracks.values + 1  ## get rid of the previous offset
 
                     shear_entr_ds = shear_entr_ds.sel(tracks=mask_tracks)
                     pe_ds = pe_ds.sel(track=mask_tracks)
 
+                    # non-lifetime-mean 
+                    cr_raw = (pe_ds.cr_sum).values
+                    pr_raw = (pe_ds.pr_sum).values
+                    pe_raw = pe_ds.pe_mean.values
 
-
-                    cr = pe_ds.cr_mean * 3600
-                    x_axis  = pe_ds.pr_mean * 3600
-                    y_axis  = pe_ds.pe_mean
-
-                    
-
-                    if lifetime_mean: 
-                        output_addon = '_lifetime_mean'
-                        cr = cr.mean(dim='times_3h', skipna=True).values
-                        x_axis = x_axis.mean(dim='times_3h', skipna=True).values
-                        y_axis = y_axis.mean(dim='times_3h', skipna=True).values
-
-                    valid = ~np.isnan(cr) & ~np.isnan(x_axis) & ~np.isnan(y_axis) 
-
-                    cr = cr[valid]
-                    x_axis  = x_axis[valid]
-                    y_axis  = y_axis[valid]
-
-                    xedges, yedges, counts = binned_stats(cr, x_axis, y_axis, nx=20, statistic='count', clip=True)
-                
-                    
-                    # g = make_jointgrid(space=0.5, density_labels=True, cbar=True)
-                    x, y = cr, x_axis
+                    valid_raw = ~np.isnan(cr_raw) & ~np.isnan(pr_raw) & ~np.isnan(pe_raw)
+                    cr_raw, pr_raw, pe_raw = cr_raw[valid_raw], pr_raw[valid_raw], pe_raw[valid_raw]
 
                 
-                    n_valid_MCS = counts.sum()
-                    percentages = (counts.T / n_valid_MCS) * 100 
-
-                    plot = ax_joint.pcolormesh(xedges, yedges, percentages, cmap=cmap, vmin=0, vmax=1.5)
-                    fig.colorbar(plot, cax=cbar_ax, label=r'$\%$ MCSs')
-                    # fig.colorbar(plot, cax=cbar_ax, label='Number of MCSs')
-                    # g.figure.colorbar(plot, cax=g.cbar_ax, label='Number of MCSs')
-                    sns.histplot(x=x, ax=ax_marg_x, color='black', stat='density', bins=20, kde=True)
-                    sns.histplot(y=y, ax=ax_marg_y, color='black', stat='density', bins=20, kde=True)
-
-                    lims = [min(x.min(), y.min()), max(x.max(), y.max())]
-                    ax_joint.axline((lims[0], lims[0]), (lims[1], lims[1]), linestyle='--', color='black')
-                    ax_joint.set_xlabel(r'Condensation rate [mm hr$^{-1}$]')
-                    ax_joint.set_ylabel(r'Surface precipitation [mm hr$^{-1}$]')                    
-
-                    ax_joint.set_xlim(xedges.min(), xedges.max())
-                    ax_joint.set_ylim(yedges.min(), yedges.max())
-
+                    scatter = ax.scatter(
+                        cr_raw, pr_raw, 
+                        c=pe_raw, 
+                        cmap=cmap,
+                        vmin=0, vmax=1,
+                        s=3
+                    )
+                    subfig.colorbar(scatter, ax=ax, label='PE')
+                    # marginal plots
                     
-        
-                    
-                    
-                    ax_marg_x.set_title(f'{mname.upper()} ' + r'n$_{tracks}$ = ' + f'{n_tracks}', pad=20)
+                
+                    # 1:1 line
+                    lims = [min(cr_raw.min(), pr_raw.min()), max(cr_raw.max(), pr_raw.max())]
+                    ax.axline((lims[0], lims[0]), (lims[1], lims[1]), linestyle='--', color='black')
+
+                    ax.set_xlabel(r'Condensation rate [kg m$^{-2}$ s$^{-1}$]')
+                    ax.set_ylabel(r'Surface precipitation [kg m$^{-2}$ s$^{-1}$]')
+                    ax.set_xlim(0, 4)
+                    ax.set_ylim(0, 4)
+
+                    ax.set_title(f'{mname} ' + r'n$_{tracks}$ = ' + f'{n_tracks}', pad=20)
 
                 plt.suptitle(f'SEASON: {season.upper()}; SURFACE: {surface.upper()}; DURATIONS: {duration.upper()}', y=1.1)
-                plt.subplots_adjust(wspace=0.3)
-                plt.savefig(f'figs/jointdist{output_addon}_cr_pr_MCScount_{season}_{surface}_duration-{duration}.png', bbox_inches = 'tight')
+                plt.subplots_adjust(wspace=-0.1, hspace=0.25)
+                axes_list = [subfig.get_axes()[0] for subfig in subfigs.flatten()]
+                p_utils.label_subplots(axes_list)
+                plt.savefig(f'figs/scatters/crSUM_prSUM_PE_{season}_{surface}_duration-{duration}')
                 plt.close()
 
 
-
-def plot_binned_line(x, y, bins, color, label, ax, stat='mean', spread='sem'):
+def plot_binned_line(x, y, bins, color, label, ax, stat='mean', spread='sem', min_count=5):
     x = np.asarray(x)
     y = np.asarray(y)
 
-    # bin edges
     bin_edges = np.linspace(np.nanmin(bins), np.nanmax(bins), len(bins))
 
-    # mean (or median) of y in each bin
     means, edges, _ = binned_statistic(x, y, statistic=stat, bins=bin_edges)
-    counts, _, _   = binned_statistic(x, y, statistic='count', bins=bin_edges)
-    stds, _, _     = binned_statistic(x, y, statistic='std', bins=bin_edges)
+    counts, _, _    = binned_statistic(x, y, statistic='count', bins=bin_edges)
+    stds, _, _      = binned_statistic(x, y, statistic='std', bins=bin_edges)
 
     centers = 0.5 * (edges[:-1] + edges[1:])
 
     if spread == 'sem':
         err = stds / np.sqrt(np.maximum(counts, 1))
-    else:  # 'std'
+    else:
         err = stds
 
-    # drop empty bins
-    valid = counts > 0
+    # drop bins with too few
+    valid = counts >= min_count
     centers, means, err = centers[valid], means[valid], err[valid]
 
-    ax.plot(centers, means, '-o', color=color, label=label)
+    if len(centers) < 2:
+        return None, None, None
+
+    ax.plot(centers, means, '-o', color=color, label=label, markersize=4)
     ax.fill_between(centers, means - err, means + err, color=color, alpha=0.25)
 
-    # optional linear trend (dashed)
     coeffs = np.polyfit(centers, means, 1)
-    trend = np.polyval(coeffs, centers)
+    trend  = np.polyval(coeffs, centers)
     ax.plot(centers, trend, '--', color=color, linewidth=1)
 
     return centers, means, err
 
+
+
+
 def shear_tbdiff_1Dhist(): 
+    bin_edges = np.linspace(-10, 20, 15)  
+
     for season in seasons: 
         for duration in durations: 
             for surface in surfaces: 
                 fig, ax = plt.subplots()
-                for mname, color in zip(list(models_dict.keys()), COLORS): 
-                    
-                    m_pid = models_dict[mname]['path_id']
-                    model = m_pid.split('/')[1]
 
-                    if season == 'all':
-                        cmap = 'Greens'
-                    elif season == 'djf': 
-                        cmap = 'Blues'
-                    elif season == 'jja': 
-                        cmap = 'YlOrRd'
+                for mname, color in zip(list(models_dict.keys()), COLORS):
+                    m_pid  = models_dict[mname]['path_id']
+                    model  = m_pid.split('/')[1]
 
+                    # load once per model
+                    STATS_URL    = models.stats_url(model)
+                    dstracks     = utils.load_track_stats(STATS_URL)
                     shear_entr_ds = xr.open_dataset(f'/gws/ssde/j25b/mcs_prime/jtodd/entrainment/data/{m_pid}/mcs_entrainment_wam.nc')
-                    pe_ds = xr.open_zarr(f'/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data/{m_pid}/mcs_condensation_rate_wam_stats.zarr')
+                    pe_ds         = xr.open_zarr(f'/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data/{m_pid}/mcs_condensation_rate_wam_stats.zarr')
 
-                    track_nums = shear_entr_ds.tracks.values - 1 ### output (mask) idxs are offset by 1 from the true track idxs
-                    
-
-
-                    
-                    MASK_URL = models.mask_url(model)
-                    STATS_URL = models.stats_url(model)
-                    mask_ds  = xr.open_zarr(MASK_URL, chunks={}, mask_and_scale=False)
-                    dstracks = utils.load_track_stats(STATS_URL)
+                    track_nums   = shear_entr_ds.tracks.values - 1
                     dstracks_wam = dstracks.isel(tracks=track_nums)
-                    start_time = pd.DatetimeIndex(dstracks_wam.start_basetime.values)
-
-
-
+                    start_time   = pd.DatetimeIndex(dstracks_wam.start_basetime.values)
 
                     jja_mask = (start_time.month >= 6) & (start_time.month <= 8)
                     djf_mask = (start_time.month <= 2) | (start_time.month == 12)
 
+                    if season == 'jja':
+                        dstracks_wam = dstracks_wam.isel(tracks=jja_mask)
+                    elif season == 'djf':
+                        dstracks_wam = dstracks_wam.isel(tracks=djf_mask)
 
-
-                    ## filter season 
-                    if season == 'all': 
-                        dstracks_wam = dstracks_wam
-                        
-                    if season == 'jja': 
-                        season_mask = jja_mask
-                        dstracks_wam = dstracks_wam.isel(tracks=season_mask)
-                    elif season == 'djf': 
-                        season_mask = djf_mask
-                        dstracks_wam = dstracks_wam.isel(tracks=season_mask)
-
-                    
                     track_durations = dstracks_wam.track_duration
-
-
-                    ## filter duration 
-                    if duration == 'all': 
-                        pass
-
-                    if duration == 'short': 
+                    if duration == 'short':
                         dstracks_wam = dstracks_wam.isel(tracks=(track_durations < 10))
-
-                    elif duration == 'long': 
+                    elif duration == 'long':
                         dstracks_wam = dstracks_wam.isel(tracks=(track_durations >= 10))
 
-
-                    ## filter surface
-                    dstracks_wam = utils.filter_surface(dstracks_wam, surface) ## default is all 
-
-
-
-                    n_tracks = len(dstracks_wam.tracks)
-                    mask_tracks = dstracks_wam.tracks.values + 1  ## get rid of the previous offset (probably not the right way of doing it but alright)
-
+                    dstracks_wam = utils.filter_surface(dstracks_wam, surface)
+                    mask_tracks  = dstracks_wam.tracks.values + 1
 
                     shear_entr_ds = shear_entr_ds.sel(tracks=mask_tracks)
-                    pe_ds = pe_ds.sel(track=mask_tracks)
-
-
+                    pe_ds         = pe_ds.sel(track=mask_tracks)
 
                     pe_vals = pe_ds.pe_mean.values
-                    x_axis  = shear_entr_ds.shear_mean.values *-1
+                    x_axis  = shear_entr_ds.shear_mean.values * -1
                     y_axis  = shear_entr_ds.tb_diff_mean.values
 
-                    valid = ~np.isnan(pe_vals) & ~np.isnan(x_axis) & ~np.isnan(y_axis) & (pe_vals <=1)
-
+                    valid   = ~np.isnan(pe_vals) & ~np.isnan(x_axis) & ~np.isnan(y_axis) & (pe_vals <= 1)
                     pe_vals = pe_vals[valid]
                     x_axis  = x_axis[valid]
                     y_axis  = y_axis[valid]
 
-                    
+                    plot_binned_line(x_axis, y_axis, bin_edges, color=color, 
+                                    label=mname.upper(), ax=ax, min_count=5)
 
-                    bin_edges = np.linspace(-20, 21, 20)
-                    ax.set_xlabel(r"Shear [m s$^{-1}$]")
-                    plot_binned_line(x_axis, y_axis, bin_edges, color=color, label=mname.upper(), ax=ax)
-                    ax.set_ylabel(r"BT$_{diff}$  [K]")
-                    ax.set_xlim(-20, 20)
-                    ax.set_ylim(-40, 40)
-                    ax.invert_yaxis()
-                    
+                ax.set_xlabel(r"Shear [m s$^{-1}$]")
+                ax.set_ylabel(r"BT$_{diff}$ [K]")
+                ax.set_xlim(-12, 20)
+                ax.set_ylim(-20, 25)
+                ax.invert_yaxis()
                 plt.suptitle(f'SEASON: {season.upper()}; SURFACE: {surface.upper()}; DURATIONS: {duration.upper()}', y=1.2)
-                
-                plt.legend(loc="upper center", bbox_to_anchor=(0.5, 1.3), ncols=3)
-                plt.savefig(f'figs/1Dhist_shear_tbdiff_{season}_{surface}_duration-{duration}.png', bbox_inches = 'tight')
+                # plt.legend(loc="upper center", bbox_to_anchor=(0.5, 1.3), ncols=3)
+                p_utils.centre_legend_above(fig, ax)
+                plt.savefig(f'figs/1D_hists/1Dhist_shear_tbdiff_{season}_{surface}_duration-{duration}')
                 plt.close()
 
-
-
 def plot_1h_norm_lifecycle(): 
-    durations = ['all', 'short', 'long']
-    for duration in durations: 
-        fig, ax = plt.subplots()
-        ax1 = ax.twinx()
-        for mname, color in zip(MNAMES, COLORS): 
-            m_id = models_dict[mname]['path_id']
-            pe_ds = xr.open_dataset(f'/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data/{m_id}/lifecycle_PE_tbdiff_wam.nc')
+    for season in seasons: 
+        for surface in surfaces: 
+            for duration in durations: 
+                fig, ax = plt.subplots()
+                ax1 = ax.twinx()
+                for mname, color in zip(MNAMES, COLORS): 
+                    m_id = models_dict[mname]['path_id']
+                    pe_ds = xr.open_dataset(f'/gws/ssde/j25b/mcs_prime/jtodd/precip_efficiency/data/{m_id}/lifecycle_PE_tbdiff_wam.nc')
 
-            ax.plot(pe_ds[f'lifecycle_pctg_{duration}'], pe_ds[f'lifecycle_mean_PE_{duration}'], color=color, label=mname, linewidth=3)
-            ax1.plot(pe_ds[f'lifecycle_pctg_{duration}'], pe_ds[f'lifecycle_mean_tbdiff_{duration}'], color=color, linewidth=2.5, linestyle='--')
-            ax.set_xlabel(r'$\%$ of Lifecycle')
-            ax.set_ylabel('Precip Efficiency')
-            ax1.set_ylabel(r'BT$_{diff}$  [K]')
-            ax.spines['right'].set_visible(True)
-        ax.plot([], [], color='grey', alpha=0.4, linewidth=3, label='PE')    
-        ax.plot([], [], color='grey', alpha=0.4, linewidth=2.5, linestyle='--', label=r'BT$_{diff}$ ')  
-        ax.legend(bbox_to_anchor = (1.15, 1.3), ncols=3)
-        
-        plt.savefig(f'figs/z9_models_1h_norm_PE+tbdiff_lifecycle_durations-{duration}.png', bbox_inches='tight')
+                    ax.plot(pe_ds[f'lifecycle_pctg_{season}_{surface}_dur{duration}'], pe_ds[f'lifecycle_mean_PE_{season}_{surface}_dur{duration}'], color=color, label=mname, linewidth=3)
+                    ax1.plot(pe_ds[f'lifecycle_pctg_{season}_{surface}_dur{duration}'], pe_ds[f'lifecycle_mean_tbdiff_{season}_{surface}_dur{duration}'], color=color, linewidth=2.5, linestyle='--')
+                    ax.set_xlabel(r'$\%$ of Lifecycle')
+                    ax.set_ylabel('Precip Efficiency')
+                    ax1.set_ylabel(r'BT$_{diff}$  [K]')
+                    ax.spines['right'].set_visible(True)
+                ax.plot([], [], color='grey', alpha=0.4, linewidth=3, label='PE')    
+                ax.plot([], [], color='grey', alpha=0.4, linewidth=2.5, linestyle='--', label=r'BT$_{diff}$ ')  
+                ax.legend(bbox_to_anchor = (1.15, 1.3), ncols=3)
+                
+                plt.savefig(f'figs/lifecycles/1h_norm_PE+tbdiff_lifecycle_{season}_{surface}_durations-{duration}')
+                plt.close()
 
 
 
@@ -973,4 +1071,20 @@ def plot_1h_norm_lifecycle():
 
 # joint_dists_cr_pr(seasons, durations, surfaces, lifetime_mean=True) 
 
-joint_dists_cr_pr_plus_contour(seasons, durations, surfaces)
+# joint_dists_cr_pr_plus_contour(seasons, durations, surfaces) 
+
+# joint_dists_crSUM_prSUM_plus_contour(seasons, durations, surfaces) 
+
+
+# plot_1h_norm_lifecycle() 
+
+# shear_tbdiff_1Dhist()
+
+# scatter_cr_pr_PE(seasons, durations, surfaces) 
+
+# shear_tbdiff_PE_scatter() 
+
+# shear_tbdiff_1Dhist() 
+
+
+joint_dists_cr_pr_plus_contour(seasons, durations, surfaces, summed=True)
