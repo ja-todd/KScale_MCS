@@ -274,54 +274,6 @@ def plot_contribution_to_total_cr():
 
     plt.savefig('figs/cr_contribution_lifecycle.pdf', bbox_inches = 'tight', dpi=300)
 
-BF_LAT_MIN, BF_LAT_MAX = 9, 15
-BF_LON_MIN, BF_LON_MAX = -5, 5
-
-
-def plot_region_map(ax, region_cfg, model_display, region_display):
-    """Map showing the analysis region and Burkina Faso sub-box."""
-    # Convert WAM lon to [-180, 180] for the map extent
-    wam_lon_min = region_cfg['lon_min'] - 360 if region_cfg['lon_min'] > 180 else region_cfg['lon_min']
-    wam_lon_max = region_cfg['lon_max']
-    wam_lat_min = region_cfg['lat_min']
-    wam_lat_max = region_cfg['lat_max']
-
-
-    proj = ccrs.PlateCarree()
-
-    ax.set_extent([wam_lon_min - 10, wam_lon_max + 10, wam_lat_min - 10, wam_lat_max + 10],
-                  crs=proj)
-    ax.coastlines(linewidth=0.8)
-    ax.add_feature(cf.BORDERS, linewidth=0.5)
-    ax.add_feature(cf.LAND, facecolor='lightgrey', alpha=0.4)
-
-    crs = ccrs.PlateCarree()
-    ax.add_patch(mpatches.Rectangle(
-        (wam_lon_min, wam_lat_min),
-        wam_lon_max - wam_lon_min, wam_lat_max - wam_lat_min,
-        linewidth=1.5, edgecolor='steelblue', facecolor='steelblue',
-        alpha=0.15, transform=proj, label=f'{region_display} region',
-    ))
-    ax.add_patch(mpatches.Rectangle(
-        (BF_LON_MIN, BF_LAT_MIN),
-        BF_LON_MAX - BF_LON_MIN, BF_LAT_MAX - BF_LAT_MIN,
-        linewidth=2, edgecolor='tab:orange', facecolor='none',
-        transform=proj, label='Burkina Faso box',
-    ))
-    ax.legend(loc='lower left')
-    ax.set_title(f'Analysis regions')
-    # plt.savefig('analysis_region.png', bbox_inches='tight')
-
-def plot_map(region_cfg, model_display, region_display):
-    fig_map, ax_map = plt.subplots(subplot_kw={'projection': ccrs.Robinson()}, figsize=(6, 5))
-    plot_region_map(ax_map, region_cfg, model_display, region_display)
-    fig_map.tight_layout()
-    path = 'analysis_region.png'
-    fig_map.savefig(path, bbox_inches = 'tight', dpi=300)
-    print(f'Saved {path}')
-    plt.close(fig_map)
-
-
 # print("plot 1")
 
 # plot_mcs_stats_PE()
@@ -349,12 +301,3 @@ model = 'um_glm_n2560_RAL3p3_tuned_hk26'
 region_cfg     = models.REGIONS[region]
 region_display = region_cfg['display']
 model_display = models.MODELS[model]['display']
-
-
-
-plot_map(region_cfg, model_display, region_display)
-
-
-
-
-
